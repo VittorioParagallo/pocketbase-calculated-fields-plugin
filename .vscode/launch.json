@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug Kursa PocketBase",
+      "name": "Plugin prototype pocketbase hook calculated fields",
       "type": "go",
       "request": "launch",
       "mode": "auto",

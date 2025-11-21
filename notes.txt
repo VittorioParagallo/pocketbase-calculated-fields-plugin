@@ -1,5 +1,11 @@
 per gestire i dati di test 
-go run . serve --dir="./test_pb_data" 
+go run . serve  
+
+per eseguire i test 
+go test -v
+
+per pulire la cache di test 
+go clean -testcache
 
 user: testuserpbx.com
 email: testuser@pbx.com
@@ -9,4 +15,4 @@ superuser: admin@admin.com
 pwd: adminadmin
 
 per eseguire il test
-go test ./app/tests -v
+go test ./tests -v

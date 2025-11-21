@@ -14,7 +14,7 @@ import (
 
 func TestComputedFieldsCreateFxCalculations(t *testing.T) {
 	//t.Parallel()
-	autApp, _ := tests.NewTestApp("./test_pb_data")
+	autApp, _ := tests.NewTestApp("../pb_data")
 	authHeader := map[string]string{"Authorization": getAuthToken(autApp, "administrators", "testuserpbx.com")}
 
 	scenarios := []tests.ApiScenario{
@@ -510,7 +510,7 @@ func TestComputedFieldsCreateFxCalculations(t *testing.T) {
 
 func TestComputedFieldsUpdateFxCalculations(t *testing.T) {
 	//t.Parallel()
-	autApp, _ := tests.NewTestApp("./test_pb_data")
+	autApp, _ := tests.NewTestApp("../pb_data")
 	authHeader := map[string]string{"Authorization": getAuthToken(autApp, "administrators", "testuserpbx.com")}
 
 	scenarios := []tests.ApiScenario{
@@ -886,7 +886,7 @@ func TestComputedFieldsUpdateFxCalculations(t *testing.T) {
 }
 
 func TestComputedFieldsDeleteFxUpdatesDependents(t *testing.T) {
-	autApp, _ := tests.NewTestApp("./test_pb_data")
+	autApp, _ := tests.NewTestApp("../pb_data")
 	authHeader := map[string]string{"Authorization": getAuthToken(autApp, "administrators", "testuserpbx.com")}
 
 	scenarios := []tests.ApiScenario{
@@ -1066,7 +1066,7 @@ func checkFormulaUpdate(t testing.TB, app *tests.TestApp, id, expectedFormula, e
 
 func setupTestApp(t testing.TB) *tests.TestApp {
 
-	testApp, err := tests.NewTestApp("./test_pb_data")
+	testApp, err := tests.NewTestApp("../pb_data")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1148,7 +1148,7 @@ func TestResolveDepsAndTxSave(t *testing.T) {
 }
 
 func TestComputedFieldsUpdatesSourceCollection(t *testing.T) {
-	autApp, _ := tests.NewTestApp("./test_pb_data")
+	autApp, _ := tests.NewTestApp("../pb_data")
 	authHeader := map[string]string{"Authorization": getAuthToken(autApp, "administrators", "testuserpbx.com")}
 	startTimeBeforePatch := time.Now()
 	scenarios := []tests.ApiScenario{
