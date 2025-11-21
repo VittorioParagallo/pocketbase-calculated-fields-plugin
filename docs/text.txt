@@ -1,0 +1,58 @@
+🟦 OnBookingQueueCreate / Update (hook)
+ │
+ ├─> avvia transazione → app.RunInTransaction()
+ │     │
+ │     ├──> e.App = txApp
+ │     ├──> 🟩 CALL → fxqueuemodule.CalculateFormulas(txApp, e.PRecord)
+ │     │
+ │     │   ┌──────────────────────────────────────────────────────────────┐
+ │     │   │             fxqueuemodule.CalculateFormulas()                │
+ │     │   └──────────────────────────────────────────────────────────────┘
+ │     │
+ │     │   🟩 1️⃣ updateDepQueuesFldAndCheckNormalizeFx
+ │     │        ├─ sostituisce "this." con queue.Id + "."
+ │     │        ├─ ricava gli ID delle parent queues
+ │     │        ├─ aggiorna il campo referenced_queues
+ │     │        └─ txApp.UnsafeWithoutHooks().Save(queue) 🧩
+ │     │             🟧 Se fallisce qui → controllare campi obbligatori o validazione DB
+ │     │
+ │     │   🟩 2️⃣ build DAG (FxDag)
+ │     │        ├─ crea nodi principali:
+ │     │        │    - actNode
+ │     │        │    - minNode
+ │     │        │    - maxNode
+ │     │        │    - linkedBookingsNode
+ │     │        │
+ │     │        ├─ per ciascuna formula modificata:
+ │     │        │     🟦 buildDagForValField()
+ │     │        │     │
+ │     │        │     ├─ registra nodo principale
+ │     │        │     ├─ 🔁 risolve variabili formula con fetchUpstreamNodeFromDB
+ │     │        │     │     ├─ FindRecordById(queueId)
+ │     │        │     │     └─ WrapRecord[BookingQueue]
+ │     │        │     └─ espande i figli (booking_queue_via_referenced_queues)
+ │     │        │
+ │     │        └─ buildDagForValField(txApp, fxDag, linkedBookingsNode)
+ │     │             (sempre eseguito)
+ │     │
+ │     │   🟩 3️⃣ TopologicalSort()
+ │     │        ├─ costruisce ordine di calcolo
+ │     │        └─ 🟧 se errore: DAG ciclico o variabile non risolta
+ │     │
+ │     │   🟩 4️⃣ Calcolo valori
+ │     │        🔁 for node in orderedNodes
+ │     │            ├─ costruisce env[queueId][valField]
+ │     │            ├─ expr.Run(node.CompiledProgram, env)
+ │     │            ├─ node.SetVal(newVal)
+ │     │            └─ se node.Dirty → Save(node.Queue.Record) 🧩
+ │     │
+ │     │        🟧 Se errore “errore calcolo formula X”:
+ │     │           → controllare sintassi formula o variabile non definita
+ │     │
+ │     │   🟩 5️⃣ Fine calcolo
+ │     │        └─ ritorna nil se tutto OK
+ │     │
+ │     └──> e.Next() (creazione effettiva record DB)
+ │           🟧 Se fallisce → errore di validazione o schema
+ │
+ └─> fine transazione

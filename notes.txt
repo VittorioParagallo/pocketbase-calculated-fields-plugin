@@ -1,0 +1,12 @@
+per gestire i dati di test 
+go run . serve --dir="./test_pb_data" 
+
+user: testuserpbx.com
+email: testuser@pbx.com
+pwd: salacadula342!
+
+superuser: admin@admin.com
+pwd: adminadmin
+
+per eseguire il test
+go test ./app/tests -v
