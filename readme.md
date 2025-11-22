@@ -1,33 +1,37 @@
 # PocketBase Calculated Fields Plugin
 
-This plugin for [PocketBase](https://pocketbase.io) introduces a dynamic **calculated fields** system on a collection "computed_fields",each record in a dedicated collection represents a formula (cell) whose value is automatically computed based on dependencies from other records.
+This plugin adds Excel-style **calculated fields** to PocketBase.  
+Each record in the `calculated_fields` collection behaves like a reactive “cell” whose value is automatically computed based on dependencies from other records.
+
+Whenever a field changes, the plugin recalculates the entire dependency graph, propagates results (and errors), and optionally triggers updates in external collections.
 
 ---
+
 ## 🚀 Quick Start
 
-This is the simplest procedure to try the plugin immediately.
+The fastest way to try the plugin.
 
-### 1️⃣ Start PocketBase 
+### 1️⃣ Start PocketBase
 
-In your terminal, inside the project root:
+From the project root:
 
 ```bash
 go run .
 ```
 
-PocketBase will start with the calculated fields hook already active.
+PocketBase will start with the calculated fields hooks enabled.
 
 ---
 
 ### 2️⃣ Log in as superuser
 
-Open in your browser:
+Open:
 
 ```
 http://127.0.0.1:8090/_/
 ```
 
-Use the default credentials:
+Credentials:
 
 - **Email:** `admin@admin.com`  
 - **Password:** `adminadmin`
@@ -36,23 +40,27 @@ Use the default credentials:
 
 ### 3️⃣ Create your first calculated field
 
-1. Go to the **calculated_fields** collection  
+1. Open the **calculated_fields** collection  
 2. Click **Create Record**  
-3. In the **formula** field, enter:
+3. Set the **formula** field to:
 
 ```
 2 + 1
 ```
 
-4. Save the record.
+4. Save.
 
-The **value** field will automatically become `3`.
+The **value** field will automatically become:
+
+```
+3
+```
 
 ---
 
 ### 4️⃣ Try more complex formulas
 
-You can use any expression supported by **expr-lang**, for example:
+Any expression supported by **expr-lang** works:
 
 ```
 (10 / 2) + 4
@@ -63,122 +71,139 @@ abs(-3) + pow(2, 3)
 
 ### 5️⃣ Reference other calculated fields (Excel-style)
 
-Every `calculated_fields` record can use the **ID of another record** as a variable.
+You can reference the **ID of another record** as if it were a variable.
 
 Example:
 
-1. Create a first record with the formula:
+1. First record:
    ```
    5 * 2
    ```
    (suppose its ID is `A1xyz0123456789`)
-2. Create a second record with the formula:
+2. Second record:
    ```
    A1xyz0123456789 + 3
    ```
 
-The second record will automatically read the value of the first one — just like an Excel cell.
-
-When the record `A1xyz0123456789` changes, the dependent record will also be recalculated.
+The second record will automatically read the value of the first one.  
+If the first record changes, the second one is recalculated too.
 
 ---
 
-This is enough to start experimenting with the calculation engine and dependency propagation.
-
-
 ## 🧩 Overview
 
-The plugin adds hooks to a specific collection, typically called `calculated_fields`. Each record in this collection acts like a cell in a spreadsheet:
-- It contains a **formula** that may reference other records (by ID).
-- The **value** is automatically computed based on the formula.
-- An optional **update_target** can be specified to update a field in another collection when this field is recalculated.
+This plugin turns PocketBase into a simple reactive computation engine:
+
+- Each record has a **formula**
+- Dependencies are detected by scanning the formula for record IDs
+- Values are evaluated server-side
+- All dependent nodes are updated via BFS
+- Errors propagate in a spreadsheet-like manner
+- Optional `update_target` allows external collections to react to recalculations
 
 ---
 
 ## 📦 Features
 
-- ⚙️ Auto-calculation on create/update/delete of records.
-- 🔁 Dependency graph traversal (BFS) to propagate changes.
-- 🔒 Validation and error handling for missing or invalid references.
-- 🧠 Caching of computed values for optimization.
-- 📤 Optional propagation of changes to external collections via `update_target`.
+- ⚙️ Automatic computation on create/update/delete  
+- 🔁 Dependency graph traversal (BFS)  
+- 🛑 Circular dependency and self-reference detection  
+- ❗ Spreadsheet-like error codes (#REF!, #DIV/0!, #VALUE!, etc.)  
+- 📡 Optional external update trigger via `update_target`  
+- 🔐 Fully transactional: every recalculation happens inside a DB transaction  
 
 ---
 
 ## 📂 Data Model
 
-Collection: `calculated_fields`
+Collection: **`calculated_fields`**
 
 | Field           | Type     | Description |
 |----------------|----------|-------------|
-| `formula`       | text     | The formula expression, using record IDs as variable names. |
-| `value`         | json     | The computed result. |
+| `formula`       | text     | Expression using record IDs as variables. |
+| `value`         | json     | Computed value. |
 | `error`         | text     | Error message, if evaluation fails. |
-| `depends_on`    | relation | References to other `calculated_fields` records this field depends on. |
-| `update_target` | text     | Optional `collection.id.field` to be updated with the computed value. |
+| `depends_on`    | relation | Automatic list of referenced record IDs. |
+| `update_target` | text     | Optional `collection.id.field` to touch when recalculated. |
 
 ---
 
 ## 🧪 Formula Syntax
 
-Formulas are compiled and executed using [expr-lang](https://github.com/expr-lang/expr).
+Formulas are executed using [expr-lang](https://github.com/expr-lang/expr).
 
 Examples:
-```go
-"abc123 + def456"
-"if(ghi789 > 10, ghi789 * 2, 0)"
+
+```
+A1xyz01234 + 10
+if(B2def > 3, B2def * 5, 0)
+pow(XYZ, 3) + abs(-7)
 ```
 
-References must match valid record IDs in the `calculated_fields` collection.
-
-For example abc123 should be the id of a record in the calculated_fields collection. During formula calculation the id will be replaced by the corresponding value in "value" field. 
+Record IDs used in the formula must correspond to valid records in `calculated_fields`.  
+During evaluation, each ID is replaced with its stored `value`.
 
 ---
 
-## ⚙️ Execution Flow
+## ⚙️ Execution Flow (Simplified)
 
-```text
-🟦 OnCalculatedFieldsCreate / Update
+```
+Create/Update event
  │
- ├─ Start transaction 
- │     │
- │     ├─ check if formula or value have changed to continue
- │     │
- │     ├─ call ResolveDepsAndTxSave(txApp, e.Record) 
- │     │       ├─ checks formula identifiers and updates "depends_on" field 
- │     │       ├─ check self-refereces to avoid loops
- │     │       ├─ prepares the env with values for formula eval
- │     │       
- │     └─ call evaluateFormulaGraph(txApp, e.Record, env)
- │          │
- │          ├─ Evaluate formula of root node
- │          ├─ BFS over children via calculated_fields_via_depends_on
- │          └─ For each:
- │               ├─ expand depends_on
- │               ├─ update env
- │               ├─ evaluate
- │               └─ applyResultAndSave() if dirty
- │                   ├─ if update_target field has a valid value, updates the foreign field
-
+ ├─ Transaction starts
+ │
+ ├─ e.Next() persists the record (inside the transaction)
+ │
+ ├─ Skip if formula/value unchanged
+ │
+ ├─ ResolveDepsAndTxSave
+ │      ├─ Parse identifiers from formula
+ │      ├─ Validate references
+ │      ├─ Detect self-reference
+ │      ├─ Update depends_on
+ │      └─ Build initial env with parent values
+ │
+ └─ evaluateFormulaGraph
+         ├─ Evaluate current node
+         ├─ If dirty → save + optional update_target
+         ├─ BFS over children via calculated_fields_via_depends_on
+         └─ For each dependent:
+                ├─ Expand dependencies
+                ├─ Update env
+                ├─ Evaluate
+                └─ Save if dirty (and touch update_target)
 ```
 
 ---
 
-## 🔁 `update_target`: Forcing External Record Updates
+## 🔁 `update_target`: Triggering External Updates
 
-The optional `update_target` field allows a record in the `calculated_fields` collection to **force the update of another record**, even if it’s not directly related.
+`update_target` **does not copy the computed value** to another record.  
+Instead, it forces PocketBase to update a datetime field in another collection.
 
-This is useful when you want to trigger downstream updates in other collections.
+Format:
 
-### 📘 Practical Example
+```
+<collection>.<recordId>.<fieldName>
+```
 
-Suppose you have a collection called `Cells`, and you want to attach a computed field (`fx`) to it.
+Example:
 
-Steps:
+```
+cells.ABC123.fx_updated_at
+```
 
-1. Add a relation field called `fx` to the `Cells` collection, pointing to the `calculated_fields` collection.
-2. In the related formula record, set the `update_target` to something like: cells.RECORD_ID.fieldName
-3. This forces PocketBase to write the current `types.NowDateTime()` to the specified field (e.g. a `last_updated` field in the `Cells` record), triggering any update hooks or refresh logic.
+What happens:
+
+- whenever the formula changes,
+- the plugin sets `fx_updated_at = now()` on the target record,
+- PocketBase emits a realtime update for that external record.
+
+Useful when:
+
+- a collection contains a relation to a `calculated_fields` record  
+- clients/watchers observe the external collection, not the calculated one  
+- you want changes to trigger UI reloads or further server hooks  
 
 ---
 
@@ -191,10 +216,12 @@ Steps:
 | `1004` | Syntax error in formula              |
 | `1005` | Referenced record not found          |
 | `1006` | Runtime error during evaluation      |
-| `1007` | Variable not found in DAG traversal  |
-| `1008` | `update_target` misconfigured         |
+| `1007` | Variable not found during DAG walk   |
+| `1008` | `update_target` misconfigured        |
 
 ---
 
-TODO
-- DESIGN ACCESS API RULES AND TEST
+## 📌 TODO
+
+- Define Access API Rules  
+- Add test suite  
