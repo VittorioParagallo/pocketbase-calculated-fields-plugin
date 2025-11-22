@@ -3,6 +3,88 @@
 This plugin for [PocketBase](https://pocketbase.io) introduces a dynamic **calculated fields** system on a collection "computed_fields",each record in a dedicated collection represents a formula (cell) whose value is automatically computed based on dependencies from other records.
 
 ---
+## 🚀 Quick Start
+
+This is the simplest procedure to try the plugin immediately.
+
+### 1️⃣ Start PocketBase 
+
+In your terminal, inside the project root:
+
+```bash
+go run .
+```
+
+PocketBase will start with the calculated fields hook already active.
+
+---
+
+### 2️⃣ Log in as superuser
+
+Open in your browser:
+
+```
+http://127.0.0.1:8090/_/
+```
+
+Use the default credentials:
+
+- **Email:** `admin@admin.com`  
+- **Password:** `adminadmin`
+
+---
+
+### 3️⃣ Create your first calculated field
+
+1. Go to the **calculated_fields** collection  
+2. Click **Create Record**  
+3. In the **formula** field, enter:
+
+```
+2 + 1
+```
+
+4. Save the record.
+
+The **value** field will automatically become `3`.
+
+---
+
+### 4️⃣ Try more complex formulas
+
+You can use any expression supported by **expr-lang**, for example:
+
+```
+(10 / 2) + 4
+abs(-3) + pow(2, 3)
+```
+
+---
+
+### 5️⃣ Reference other calculated fields (Excel-style)
+
+Every `calculated_fields` record can use the **ID of another record** as a variable.
+
+Example:
+
+1. Create a first record with the formula:
+   ```
+   5 * 2
+   ```
+   (suppose its ID is `A1xyz0123456789`)
+2. Create a second record with the formula:
+   ```
+   A1xyz0123456789 + 3
+   ```
+
+The second record will automatically read the value of the first one — just like an Excel cell.
+
+When the record `A1xyz0123456789` changes, the dependent record will also be recalculated.
+
+---
+
+This is enough to start experimenting with the calculation engine and dependency propagation.
+
 
 ## 🧩 Overview
 
@@ -77,8 +159,7 @@ For example abc123 should be the id of a record in the calculated_fields collect
  │               ├─ evaluate
  │               └─ applyResultAndSave() if dirty
  │                   ├─ if update_target field has a valid value, updates the foreign field
- │
- └─ e.Next()
+
 ```
 
 ---
