@@ -220,6 +220,30 @@ Useful when:
 | `1008` | `update_target` misconfigured        |
 
 ---
+## Next steps: designing access rules
+
+One open question is how to handle **API access rules** for the `calculated_fields` collection.
+
+To behave like a real “computed field” plugin, this collection is not meant to be accessed directly by the client.  
+Instead, it should inherit the access permissions of the collections that reference it.
+
+### The challenge
+
+Imagine you have a collection `collection1` with a relation field: fx_field → calculated_fields
+Now the client should be able to read **only** the calculated_fields record referenced by `fx_field`, and **not** any other records in the `calculated_fields` collection.
+
+However:
+
+- another collection (e.g., `collection2`) may reference **other** calculated_fields records,
+- and each collection may have different access rules,
+- while all calculated_fields are stored in the *same* underlying table.
+
+We need a way to ensure that:
+1. **Access to a calculated_fields record is allowed only if it is referenced by a record the client is permitted to read.**
+2. **Different collections can safely reference different computed fields without exposing each other's records.**
+3. **The plugin remains generic:** it should work regardless of how many collections reference it.
+
+if anyone has experience implementing cross-collection permission inheritance in PocketBase, your input would be extremely valuable.
 
 ## 📌 TODO
 
