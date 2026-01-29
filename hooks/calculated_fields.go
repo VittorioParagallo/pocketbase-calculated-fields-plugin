@@ -3,6 +3,11 @@ package hooks
 import (
 	"encoding/json"
 	"fmt"
+
+	"math"
+	"regexp"
+	"strings"
+
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/file"
 	"github.com/ganigeorgiev/fexpr"
@@ -10,14 +15,20 @@ import (
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/types"
-	"math"
-	"regexp"
-	"strings"
 )
 
 // se chiamato senza parametri registra tutto altrimenti le funzioni indicate nei parametri
 func BindCalculatedFieldsHooks(app core.App) {
+	app.OnCollectionValidate().BindFunc(CalculatedFieldsOwnersSchemaGuards)
+	app.OnRecordViewRequest("calculated_fields").BindFunc(CalculatedFieldsViewRequestGuard)
+	app.OnRecordsListRequest("calculated_fields").BindFunc(CalculatedFieldsListRequestGuard) // o l’equivalente nella tua versione
+
+	app.OnRecordCreate().BindFunc(OnOwnerCreate_AutoCreateCalculatedFields)
+	app.OnRecordDelete().BindFunc(OnOwnerDelete_AutoDeleteCalculatedFields)
+
 	app.OnRecordCreate("calculated_fields").BindFunc(OnCalculatedFieldsCreateUpdate)
+	// user può fare update sul record solo se può fare update sull'owner
+	app.OnRecordUpdateRequest("calculated_fields").BindFunc(CalculatedFieldsUpdateRequestGuard)
 	app.OnRecordUpdate("calculated_fields").BindFunc(OnCalculatedFieldsCreateUpdate)
 	app.OnRecordDelete("calculated_fields").BindFunc(OnCalculatedFieldsDelete)
 }
@@ -33,12 +44,25 @@ func OnCalculatedFieldsCreateUpdate(e *core.RecordEvent) error {
 			return err
 		}
 
-		// Skip se formula o value invariata
-		if e.Record.GetString("formula") == e.Record.Original().GetString("formula") {
-			if e.Record.GetString("value") == e.Record.Original().GetString("value") {
-				return nil
+		orig := e.Record.Original()
+		origFormula := orig.GetString("formula")
+		newFormula := e.Record.GetString("formula")
+
+		if newFormula == origFormula {
+			// niente ricalcolo, niente touch owner
+			return nil
+		}
+
+		if orig.GetString("owner_collection") != "" || orig.GetString("owner_row") != "" || orig.GetString("owner_field") != "" {
+			if e.Record.GetString("owner_collection") != orig.GetString("owner_collection") ||
+				e.Record.GetString("owner_row") != orig.GetString("owner_row") ||
+				e.Record.GetString("owner_field") != orig.GetString("owner_field") {
+				return apis.NewBadRequestError("Cannot change calculated_field owner", validation.Errors{
+					"owner": validation.NewError("1010", "owner_collection/owner_row/owner_field are immutable once set"),
+				})
 			}
 		}
+
 		// 1️⃣ Normalizza formule e aggiorna referenced_queues e salva nella transazione
 		var err error
 		var init_env map[string]any
@@ -130,11 +154,27 @@ func ResolveDepsAndTxSave(app core.App, rec *core.Record) (map[string]any, error
 				rec.Id: validation.NewError("1005", fmt.Sprintf("Reference in formula %s not found", rec.Id))},
 		)
 	}
-	if len(env_init_list) == 0 {
+	if len(env_init_list) != len(parentIds) {
+
+		found := make(map[string]bool, len(env_init_list))
+		for _, r := range env_init_list {
+			found[r.Id] = true
+		}
+
+		var missing []string
+		for _, pid := range parentIds {
+			if !found[pid] {
+				missing = append(missing, pid)
+			}
+		}
+
 		return nil, apis.NewBadRequestError(
-			fmt.Sprintf("Formula evaluation error: referenced variable not found: %s", parentIds),
+			fmt.Sprintf("Formula evaluation error: referenced variable not found: %v", missing),
 			validation.Errors{
-				"formula": validation.NewError("1007", fmt.Sprintf("Variable not found in DAG during evaluation. %s", parentIds)),
+				"formula": validation.NewError(
+					"1007",
+					fmt.Sprintf("Variable not found in DAG during evaluation: %v", missing),
+				),
 			},
 		)
 	}
@@ -154,7 +194,17 @@ func ResolveDepsAndTxSave(app core.App, rec *core.Record) (map[string]any, error
 }
 
 func applyResultAndSave(txApp core.App, node *core.Record, value any, errMsg string, env map[string]any, newDepends []string) error {
-	node.Set("value", value)
+		b, err := json.Marshal(value)
+	if err != nil {
+		return apis.NewBadRequestError("Failed to serialize calculated value", validation.Errors{
+			node.Id: validation.NewError("1012", fmt.Sprintf("Invalid computed value for %s: %v", node.Id, err)),
+		})
+	}
+
+	jsonValue := string(b)
+	
+	
+	node.Set("value", jsonValue)
 	node.Set("error", errMsg)
 	if newDepends != nil {
 		node.Set("depends_on", newDepends)
@@ -164,31 +214,31 @@ func applyResultAndSave(txApp core.App, node *core.Record, value any, errMsg str
 	if err := txApp.UnsafeWithoutHooks().Save(node); err != nil {
 		return fmt.Errorf("errore salvataggio queue %s: %v", node.Id, err)
 	}
-	//---UPDATE SOURCE FIELD IF PRESENT
-	source := node.GetString("update_target")
-	if source == "" {
+	//---UPDATE OWNER UPDATED FIELD IF PRESENT
+	// --- TOUCH OWNER.updated (deterministic, strict)
+	ownerCol := node.GetString("owner_collection")
+	ownerRow := node.GetString("owner_row")
+
+	// se non c'è owner, non tocchiamo nulla (ma puoi decidere di renderlo errore)
+	if ownerCol == "" || ownerRow == "" {
 		return nil
 	}
 
-	parts := strings.Split(source, ".")
-	col, recId, field := parts[0], parts[1], parts[2]
-
-	// Verifica record esiste
-	rec, err := txApp.FindRecordById(col, recId)
+	ownerRec, err := txApp.FindRecordById(ownerCol, ownerRow)
 	if err != nil {
-		return apis.NewBadRequestError("update_target points to missing record", validation.Errors{
+		return apis.NewBadRequestError("owner record not found", validation.Errors{
 			node.Id: validation.NewError("1008",
-				fmt.Sprintf("Invalid update_target: record %s/%s not found", col, recId)),
+				fmt.Sprintf("Invalid owner reference: record %s/%s not found.", ownerCol, ownerRow)),
 		})
 	}
 
-	// Aggiornamento
-	rec.Set(field, types.NowDateTime())
+	// Aggiornamento deterministico
+	ownerRec.Set("updated", types.NowDateTime())
 
-	if err := txApp.Save(rec); err != nil {
-		return apis.NewBadRequestError("Failed to update update_target field", validation.Errors{
+	if err := txApp.Save(ownerRec); err != nil {
+		return apis.NewBadRequestError("Failed to update owner 'updated' field", validation.Errors{
 			node.Id: validation.NewError("1008",
-				fmt.Sprintf("Failed to update %s: %v", source, err)),
+				fmt.Sprintf("Failed to touch owner %s/%s.updated: %v", ownerCol, ownerRow, err)),
 		})
 	}
 
@@ -362,6 +412,9 @@ func translateFormulaError(txApp core.App, node *core.Record, err error) (any, s
 	}
 
 	switch {
+	case strings.Contains(ferr.Message, "invalid operation: cannot call nil"):
+		return "#NAME?", "Funzione non riconosciuta o non definita", nil
+
 	case strings.Contains(ferr.Message, "invalid operation") && strings.Contains(ferr.Message, "<nil>"):
 		if _, dep_err := ResolveDepsAndTxSave(txApp, node); dep_err != nil {
 			return "", "", dep_err
@@ -370,9 +423,6 @@ func translateFormulaError(txApp core.App, node *core.Record, err error) (any, s
 
 	case strings.Contains(ferr.Message, "invalid operation"):
 		return "#VALUE!", "Tipo non compatibile nell'operazione", nil
-
-	case strings.Contains(ferr.Message, "reflect: call of reflect.Value.Call on zero Value"):
-		return "#NAME?", "Funzione non riconosciuta o non definita", nil
 
 	default:
 		return "#VALUE!", ferr.Message, nil
@@ -388,5 +438,11 @@ func expandFormulaDependencies(app core.App, node *core.Record) error {
 }
 
 func isDirty(node *core.Record, value any, errMsg string) bool {
-	return value != node.Original().GetString("value") || errMsg != node.Original().GetString("error")
+	b, err := json.Marshal(value)
+	if err != nil {
+		// se non serializza, consideriamolo dirty così almeno scrivi l’errore a db
+		return true
+	}
+	return string(b) != node.Original().GetString("value") ||
+		errMsg != node.Original().GetString("error")
 }

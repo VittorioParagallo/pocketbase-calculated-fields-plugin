@@ -1,116 +1,38 @@
 # PocketBase Calculated Fields Plugin
 
-This plugin adds Excel-style **calculated fields** to PocketBase.  
-Each record in the `calculated_fields` collection behaves like a reactive “cell” whose value is automatically computed based on dependencies from other records.
+This plugin adds **server-side calculated fields** to PocketBase collections.
 
-Whenever a field changes, the plugin recalculates the entire dependency graph, propagates results (and errors), and optionally triggers updates in external collections.
+Each calculated field is a record in the `calculated_fields` collection and is always attached to a real **owner record** (for example: `booking_queue`, or any other collection).
 
----
-
-## 🚀 Quick Start
-
-The fastest way to try the plugin.
-
-### 1️⃣ Start PocketBase
-
-From the project root:
-
-```bash
-go run .
-```
-
-PocketBase will start with the calculated fields hooks enabled.
+Formulas are automatically evaluated, dependency graphs are built, and updates propagate transactionally across dependent calculated fields — similar to spreadsheet behavior, but fully integrated with PocketBase collections, permissions and hooks.
 
 ---
 
-### 2️⃣ Log in as superuser
+## ✨ Key Concepts
 
-Open:
+A calculated field is defined by:
 
-```
-http://127.0.0.1:8090/_/
-```
+- a **formula**
+- an **owner collection**
+- an **owner record**
+- an **owner field**
 
-Credentials:
-
-- **Email:** `admin@admin.com`  
-- **Password:** `adminadmin`
-
----
-
-### 3️⃣ Create your first calculated field
-
-1. Open the **calculated_fields** collection  
-2. Click **Create Record**  
-3. Set the **formula** field to:
-
-```
-2 + 1
-```
-
-4. Save.
-
-The **value** field will automatically become:
-
-```
-3
-```
-
----
-
-### 4️⃣ Try more complex formulas
-
-Any expression supported by **expr-lang** works:
-
-```
-(10 / 2) + 4
-abs(-3) + pow(2, 3)
-```
-
----
-
-### 5️⃣ Reference other calculated fields (Excel-style)
-
-You can reference the **ID of another record** as if it were a variable.
-
-Example:
-
-1. First record:
-   ```
-   5 * 2
-   ```
-   (suppose its ID is `A1xyz0123456789`)
-2. Second record:
-   ```
-   A1xyz0123456789 + 3
-   ```
-
-The second record will automatically read the value of the first one.  
-If the first record changes, the second one is recalculated too.
-
----
-
-## 🧩 Overview
-
-This plugin turns PocketBase into a simple reactive computation engine:
-
-- Each record has a **formula**
-- Dependencies are detected by scanning the formula for record IDs
-- Values are evaluated server-side
-- All dependent nodes are updated via BFS
-- Errors propagate in a spreadsheet-like manner
-- Optional `update_target` allows external collections to react to recalculations
+Example:  
+> “This calculated field computes `min_fx` for booking_queue `queue_a0001` using a formula that depends on other calculated fields.”
 
 ---
 
 ## 📦 Features
 
-- ⚙️ Automatic computation on create/update/delete  
-- 🔁 Dependency graph traversal (BFS)  
-- 🛑 Circular dependency and self-reference detection  
-- ❗ Spreadsheet-like error codes (#REF!, #DIV/0!, #VALUE!, etc.)  
-- 📡 Optional external update trigger via `update_target`  
-- 🔐 Fully transactional: every recalculation happens inside a DB transaction  
+- ⚙️ Automatic evaluation on create / update / delete  
+- 🔁 Dependency graph resolution (DAG, BFS propagation)  
+- 🛑 Self-reference and circular dependency detection  
+- ❗ Spreadsheet-like error handling (`#REF!`, `#DIV/0!`, `#VALUE!`, etc.)  
+- 🔐 Permission-aware: update allowed only if owner record is writable  
+- 🧹 Cascade delete when owner record is deleted  
+- ⏱ Touches `owner.updated` only when value actually changes  
+- 🧪 Full test suite with isolated test database  
+- 💯 Transactional: all recalculations happen inside one DB transaction  
 
 ---
 
@@ -118,13 +40,74 @@ This plugin turns PocketBase into a simple reactive computation engine:
 
 Collection: **`calculated_fields`**
 
-| Field           | Type     | Description |
-|----------------|----------|-------------|
-| `formula`       | text     | Expression using record IDs as variables. |
-| `value`         | json     | Computed value. |
-| `error`         | text     | Error message, if evaluation fails. |
-| `depends_on`    | relation | Automatic list of referenced record IDs. |
-| `update_target` | text     | Optional `collection.id.field` to touch when recalculated. |
+| Field | Type | Description |
+|------|------|-------------|
+| `formula` | text | Expression evaluated with expr-lang |
+| `value` | json | Computed value |
+| `error` | text | Error message if evaluation fails |
+| `depends_on` | relation (self) | Referenced calculated_fields |
+| `owner_collection` | text | Collection name of the owner |
+| `owner_row` | text | Record ID of the owner |
+| `owner_field` | text | Field name in the owner record |
+
+Each calculated field belongs to exactly **one owner record**.
+
+---
+
+## 🚀 Quick Start
+
+### 1️⃣ Run PocketBase
+
+```bash
+go run .
+```
+
+---
+
+### 2️⃣ 🧠 Automatic Owner Synchronization (Collections → calculated_fields)
+
+One of the core features of this plugin is the automatic synchronization between any collection and the calculated_fields collection.
+
+Whenever a record is created or updated in a collection that contains a relation field pointing to calculated_fields, the plugin automatically manages the lifecycle of the corresponding calculated field record.
+
+This makes calculated_fields behave like a true computed field attached to another collection, rather than a standalone table.
+
+🔹 Automatic creation of calculated_fields records
+
+If a collection contains a relation field referencing calculated_fields (for example: min_fx, max_fx, act_fx, etc.):
+
+When a new record is created in that collection:
+	•	the plugin automatically creates a corresponding record in calculated_fields
+	•	links it back to the owner record
+	•	initializes its formula and metadata
+	•	sets ownership information
+
+This happens transparently inside the same database transaction.
+
+Example:
+
+Collection: booking_queue
+Field: min_fx → relation to calculated_fields
+
+When you create a new booking_queue record:
+booking_queue
+ └─ min_fx → calculated_fields record is automatically created
+
+### 3️⃣ Edit a calculated field formula
+
+Open the `calculated_fields` collection and update:
+
+```text
+formula = 2 + 3
+```
+
+The plugin automatically computes:
+
+```text
+value = 5
+```
+
+and touches the owner record `updated` field.
 
 ---
 
@@ -132,120 +115,140 @@ Collection: **`calculated_fields`**
 
 Formulas are executed using [expr-lang](https://github.com/expr-lang/expr).
 
-Examples:
+You can reference other calculated fields by ID:
 
-```
-A1xyz01234 + 10
-if(B2def > 3, B2def * 5, 0)
-pow(XYZ, 3) + abs(-7)
+```text
+booking_queue_queue_a0001_min + 1
 ```
 
-Record IDs used in the formula must correspond to valid records in `calculated_fields`.  
-During evaluation, each ID is replaced with its stored `value`.
+You can use functions:
+
+```text
+sum([A, B, 3])
+max(X, Y)
+if(A > 10) { 1 } else { 0 }
+len(my_array)
+```
+
+Supported patterns include:
+
+- numeric operations  
+- arrays  
+- aggregate functions  
+- ternary / if blocks  
+- nested formulas  
+
+---
+
+## 🔗 Dependency Resolution
+
+When a formula is created or updated:
+
+1. Identifiers are parsed from the formula  
+2. Dependencies are extracted (`depends_on`)  
+3. Self-reference is rejected  
+4. Cycles are detected  
+5. DAG is built  
+6. Evaluation propagates to dependent nodes  
+
+Only nodes whose `(value, error)` actually changed are persisted.
 
 ---
 
 ## ⚙️ Execution Flow (Simplified)
 
-```
-Create/Update event
+```text
+Create/Update calculated_field
  │
  ├─ Transaction starts
  │
- ├─ e.Next() persists the record (inside the transaction)
+ ├─ Validate owner exists
+ ├─ Check permission on owner updateRule
+ ├─ Parse formula identifiers
+ ├─ Update depends_on
  │
- ├─ Skip if formula/value unchanged
- │
- ├─ ResolveDepsAndTxSave
- │      ├─ Parse identifiers from formula
- │      ├─ Validate references
- │      ├─ Detect self-reference
- │      ├─ Update depends_on
- │      └─ Build initial env with parent values
- │
- └─ evaluateFormulaGraph
-         ├─ Evaluate current node
-         ├─ If dirty → save + optional update_target
-         ├─ BFS over children via calculated_fields_via_depends_on
-         └─ For each dependent:
-                ├─ Expand dependencies
-                ├─ Update env
-                ├─ Evaluate
-                └─ Save if dirty (and touch update_target)
+ └─ evaluateGraph():
+        ├─ evaluate node
+        ├─ if dirty → save
+        ├─ touch owner.updated
+        └─ BFS propagate to children
 ```
 
 ---
 
-## 🔁 `update_target`: Triggering External Updates
+## 🔐 Security & Permissions
 
-`update_target` **does not copy the computed value** to another record.  
-Instead, it forces PocketBase to update a datetime field in another collection.
+Updating a calculated field requires permission to update its owner record.
 
-Format:
+Rules:
+- superuser always allowed  
+- otherwise: `app.CanAccessRecord(owner, updateRule)`  
+- prevents hijacking calculated fields from foreign records  
 
-```
-<collection>.<recordId>.<fieldName>
-```
+This makes calculated fields behave like **true computed properties** of the owner collection.
 
-Example:
+---
 
-```
-cells.ABC123.fx_updated_at
-```
+## 🗑 Cascade Delete
 
-What happens:
+When an owner record is deleted:
 
-- whenever the formula changes,
-- the plugin sets `fx_updated_at = now()` on the target record,
-- PocketBase emits a realtime update for that external record.
-
-Useful when:
-
-- a collection contains a relation to a `calculated_fields` record  
-- clients/watchers observe the external collection, not the calculated one  
-- you want changes to trigger UI reloads or further server hooks  
+- all its calculated_fields are deleted automatically  
+- dependent formulas are rewritten to `#REF!`  
+- errors propagate safely  
 
 ---
 
 ## 🧯 Error Codes
 
-| Code   | Meaning                              |
-|--------|--------------------------------------|
-| `1002` | Self-reference in formula            |
-| `1003` | Circular dependency detected         |
-| `1004` | Syntax error in formula              |
-| `1005` | Referenced record not found          |
-| `1006` | Runtime error during evaluation      |
-| `1007` | Variable not found during DAG walk   |
-| `1008` | `update_target` misconfigured        |
+| Code | Meaning |
+|------|--------|
+| `1002` | Self reference in formula |
+| `1003` | Circular dependency |
+| `1004` | Syntax error |
+| `1005` | Referenced record not found |
+| `1006` | Runtime evaluation error |
+| `1007` | Missing variable during DAG walk |
+| `1008` | Invalid owner reference |
 
 ---
-## Next steps: designing access rules
 
-One open question is how to handle **API access rules** for the `calculated_fields` collection.
+## 🧪 Testing
 
-To behave like a real “computed field” plugin, this collection is not meant to be accessed directly by the client.  
-Instead, it should inherit the access permissions of the collections that reference it.
+The plugin includes a full test suite covering:
 
-### The challenge
+- formula evaluation  
+- propagation  
+- cycles  
+- error handling  
+- permissions  
+- cascade delete  
+- owner updated touch  
+- dirty-check optimization  
+- null / empty handling  
 
-Imagine you have a collection `collection1` with a relation field: fx_field → calculated_fields
-Now the client should be able to read **only** the calculated_fields record referenced by `fx_field`, and **not** any other records in the `calculated_fields` collection.
+Tests use an isolated `test_pb_data` database snapshot (no migrations).
 
-However:
+---
 
-- another collection (e.g., `collection2`) may reference **other** calculated_fields records,
-- and each collection may have different access rules,
-- while all calculated_fields are stored in the *same* underlying table.
+## 🧭 Design Philosophy
 
-We need a way to ensure that:
-1. **Access to a calculated_fields record is allowed only if it is referenced by a record the client is permitted to read.**
-2. **Different collections can safely reference different computed fields without exposing each other's records.**
-3. **The plugin remains generic:** it should work regardless of how many collections reference it.
+This plugin is not a spreadsheet emulator.  
+It is a **reactive computation engine integrated into PocketBase’s data model**.
 
-if anyone has experience implementing cross-collection permission inheritance in PocketBase, your input would be extremely valuable.
+Goals:
+
+- behave like a native field  
+- respect PocketBase rules and hooks  
+- be deterministic and transactional  
+- be safe in multi-collection environments  
+- remain generic and reusable  
+
+---
 
 ## 📌 TODO
 
-- Define Access API Rules  
-- Add test suite  
+- Documentation of supported functions  
+- Example schemas  
+- Performance benchmarks  
+- UI helper for formula editing  
