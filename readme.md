@@ -17,9 +17,6 @@ A calculated field is defined by:
 - an **owner record**
 - an **owner field**
 
-Example:  
-> “This calculated field computes `min_fx` for booking_queue `queue_a0001` using a formula that depends on other calculated fields.”
-
 ---
 
 ## 📦 Features
@@ -61,7 +58,158 @@ Each calculated field belongs to exactly **one owner record**.
 ```bash
 go run .
 ```
-
+then you can create any collection with a relation field to calculated_field. You should immagine the calculated field like a merged field in the owner collection and not care about the external table.
+If you import the code in your project make sure to create a calculated_fields table like:
+```
+{
+  "id": "pbc_2828438558",
+  "listRule": "@request.auth.id != \"\" ",
+  "viewRule": "@request.auth.id != \"\" ",
+  "createRule": null,
+  "updateRule": "@request.auth.id != \"\"",
+  "deleteRule": null,
+  "name": "calculated_fields",
+  "type": "base",
+  "fields": [
+    {
+      "autogeneratePattern": "[a-z0-9A-Z_]{15}",
+      "hidden": false,
+      "id": "text3208210256",
+      "max": 0,
+      "min": 15,
+      "name": "id",
+      "pattern": "^[a-z0-9A-Z_]+$",
+      "presentable": false,
+      "primaryKey": true,
+      "required": true,
+      "system": true,
+      "type": "text"
+    },
+    {
+      "autogeneratePattern": "",
+      "hidden": false,
+      "id": "text1731287169",
+      "max": 0,
+      "min": 0,
+      "name": "formula",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": true,
+      "system": false,
+      "type": "text"
+    },
+    {
+      "hidden": false,
+      "id": "json494360628",
+      "maxSize": 0,
+      "name": "value",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "json"
+    },
+    {
+      "autogeneratePattern": "",
+      "hidden": false,
+      "id": "text1574812785",
+      "max": 0,
+      "min": 0,
+      "name": "error",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": false,
+      "system": false,
+      "type": "text"
+    },
+    {
+      "cascadeDelete": false,
+      "collectionId": "pbc_2828438558",
+      "hidden": false,
+      "id": "relation1357191210",
+      "maxSelect": 999,
+      "minSelect": 0,
+      "name": "depends_on",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "relation"
+    },
+    {
+      "autogeneratePattern": "",
+      "hidden": false,
+      "id": "text2921856119",
+      "max": 0,
+      "min": 0,
+      "name": "owner_collection",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": true,
+      "system": false,
+      "type": "text"
+    },
+    {
+      "autogeneratePattern": "",
+      "hidden": false,
+      "id": "text737929361",
+      "max": 0,
+      "min": 0,
+      "name": "owner_row",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": true,
+      "system": false,
+      "type": "text"
+    },
+    {
+      "autogeneratePattern": "",
+      "hidden": false,
+      "id": "text2876010623",
+      "max": 0,
+      "min": 0,
+      "name": "owner_field",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": true,
+      "system": false,
+      "type": "text"
+    },
+    {
+      "hidden": false,
+      "id": "autodate2990389176",
+      "name": "created",
+      "onCreate": true,
+      "onUpdate": false,
+      "presentable": false,
+      "system": false,
+      "type": "autodate"
+    },
+    {
+      "hidden": false,
+      "id": "autodate3332085495",
+      "name": "updated",
+      "onCreate": true,
+      "onUpdate": true,
+      "presentable": false,
+      "system": false,
+      "type": "autodate"
+    }
+  ],
+  "indexes": [
+    "CREATE UNIQUE INDEX `idx_YNg4iO7WjN` ON `calculated_fields` (\n  `owner_collection`,\n  `owner_row`,\n  `owner_field`\n)",
+    "CREATE INDEX `idx_mEyneRsYiH` ON `calculated_fields` (`owner_row`)",
+    "CREATE INDEX `idx_6f4JzAzWdy` ON `calculated_fields` (`owner_collection`)",
+    "CREATE INDEX `idx_hIue6Y0lhZ` ON `calculated_fields` (`owner_field`)"
+  ],
+  "created": "2025-11-01 18:50:58.367Z",
+  "updated": "2026-01-17 22:53:30.111Z",
+  "system": false
+}
+```
 ---
 
 ### 2️⃣ 🧠 Automatic Owner Synchronization (Collections → calculated_fields)
