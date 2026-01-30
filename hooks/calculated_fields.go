@@ -3,11 +3,9 @@ package hooks
 import (
 	"encoding/json"
 	"fmt"
-
 	"math"
 	"regexp"
 	"strings"
-
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/file"
 	"github.com/ganigeorgiev/fexpr"
@@ -18,19 +16,20 @@ import (
 )
 
 // se chiamato senza parametri registra tutto altrimenti le funzioni indicate nei parametri
-func BindCalculatedFieldsHooks(app core.App) {
+func BindCalculatedFieldsHooks(app core.App) error {
 	app.OnCollectionValidate().BindFunc(CalculatedFieldsOwnersSchemaGuards)
-	app.OnRecordViewRequest("calculated_fields").BindFunc(CalculatedFieldsViewRequestGuard)
-	app.OnRecordsListRequest("calculated_fields").BindFunc(CalculatedFieldsListRequestGuard) // o l’equivalente nella tua versione
+	app.OnRecordViewRequest("_calculated_fields").BindFunc(CalculatedFieldsViewRequestGuard)
+	app.OnRecordsListRequest("_calculated_fields").BindFunc(CalculatedFieldsListRequestGuard) // o l’equivalente nella tua versione
 
 	app.OnRecordCreate().BindFunc(OnOwnerCreate_AutoCreateCalculatedFields)
 	app.OnRecordDelete().BindFunc(OnOwnerDelete_AutoDeleteCalculatedFields)
 
-	app.OnRecordCreate("calculated_fields").BindFunc(OnCalculatedFieldsCreateUpdate)
+	app.OnRecordCreate("_calculated_fields").BindFunc(OnCalculatedFieldsCreateUpdate)
 	// user può fare update sul record solo se può fare update sull'owner
-	app.OnRecordUpdateRequest("calculated_fields").BindFunc(CalculatedFieldsUpdateRequestGuard)
-	app.OnRecordUpdate("calculated_fields").BindFunc(OnCalculatedFieldsCreateUpdate)
-	app.OnRecordDelete("calculated_fields").BindFunc(OnCalculatedFieldsDelete)
+	app.OnRecordUpdateRequest("_calculated_fields").BindFunc(CalculatedFieldsUpdateRequestGuard)
+	app.OnRecordUpdate("_calculated_fields").BindFunc(OnCalculatedFieldsCreateUpdate)
+	app.OnRecordDelete("_calculated_fields").BindFunc(OnCalculatedFieldsDelete)
+	return nil
 }
 
 func OnCalculatedFieldsCreateUpdate(e *core.RecordEvent) error {
@@ -89,7 +88,7 @@ func OnCalculatedFieldsDelete(e *core.RecordEvent) error {
 		visited := map[string]struct{}{}
 
 		//cicla i nodi direttamente dipendenti, aggiorna i campi e crea transitiveDepQueues
-		for _, direct := range e.Record.ExpandedAll("calculated_fields_via_depends_on") {
+		for _, direct := range e.Record.ExpandedAll("_calculated_fields_via_depends_on") {
 			visited[direct.Id] = struct{}{}
 			formula := direct.GetString("formula")
 			updatedFormula := strings.ReplaceAll(formula, deletedRecord.Id, "#REF!")
@@ -146,7 +145,7 @@ func ResolveDepsAndTxSave(app core.App, rec *core.Record) (map[string]any, error
 	}
 
 	// 2️⃣ Verifica che i record referenziati esistano
-	env_init_list, err := app.FindRecordsByIds("calculated_fields", parentIds)
+	env_init_list, err := app.FindRecordsByIds("_calculated_fields", parentIds)
 	if err != nil {
 		return nil, apis.NewBadRequestError(
 			fmt.Sprintf("Failed to find referenced records %v", parentIds),
@@ -194,7 +193,7 @@ func ResolveDepsAndTxSave(app core.App, rec *core.Record) (map[string]any, error
 }
 
 func applyResultAndSave(txApp core.App, node *core.Record, value any, errMsg string, env map[string]any, newDepends []string) error {
-		b, err := json.Marshal(value)
+	b, err := json.Marshal(value)
 	if err != nil {
 		return apis.NewBadRequestError("Failed to serialize calculated value", validation.Errors{
 			node.Id: validation.NewError("1012", fmt.Sprintf("Invalid computed value for %s: %v", node.Id, err)),
@@ -202,8 +201,7 @@ func applyResultAndSave(txApp core.App, node *core.Record, value any, errMsg str
 	}
 
 	jsonValue := string(b)
-	
-	
+
 	node.Set("value", jsonValue)
 	node.Set("error", errMsg)
 	if newDepends != nil {
@@ -292,7 +290,7 @@ func evaluateFormulaGraph(txApp core.App, node *core.Record, env map[string]any)
 		return err
 	}
 	// ---------
-	children := node.ExpandedAll("calculated_fields_via_depends_on")
+	children := node.ExpandedAll("_calculated_fields_via_depends_on")
 	//------------
 	for i := 0; i < len(children); i++ {
 		child := children[i]
@@ -334,7 +332,7 @@ func evaluateFormulaGraph(txApp core.App, node *core.Record, env map[string]any)
 		}
 
 		// 🔹 3️⃣ Espansione BFS verso i figli
-		grandChildren := child.ExpandedAll("calculated_fields_via_depends_on")
+		grandChildren := child.ExpandedAll("_calculated_fields_via_depends_on")
 		for _, grandChild := range grandChildren {
 
 			children = append(children, grandChild)
@@ -430,7 +428,7 @@ func translateFormulaError(txApp core.App, node *core.Record, err error) (any, s
 }
 
 func expandFormulaDependencies(app core.App, node *core.Record) error {
-	errs := app.ExpandRecord(node, []string{"calculated_fields_via_depends_on", "depends_on"}, nil)
+	errs := app.ExpandRecord(node, []string{"_calculated_fields_via_depends_on", "depends_on"}, nil)
 	if len(errs) != 0 {
 		return fmt.Errorf("failed to expand referenced queues: %v", errs)
 	}

@@ -16,14 +16,14 @@ func TestCalculatedFieldsSchemaGuard_BlocksMultiSelectRelation(t *testing.T) {
 	autApp, _ := tests.NewTestApp("../pb_data")
 	authHeader := map[string]string{"Authorization": getSuperuserToken(t, autApp)}
 
-	// NB: qui uso direttamente l'ID della collection calculated_fields che hai nel dump:
+	// NB: qui uso direttamente l'ID della collection _calculated_fields che hai nel dump:
 	// "id": "pbc_2828438558"
 	// Se in futuro cambia, lo rendiamo dinamico.
 	const calculatedFieldsColId = "pbc_2828438558"
 
 	scenarios := []tests.ApiScenario{
 		{
-			Name:   "Schema guard: blocca relation verso calculated_fields con maxSelect > 1",
+			Name:   "Schema guard: blocca relation verso _calculated_fields con maxSelect > 1",
 			Method: http.MethodPost,
 			URL:    "/api/collections",
 			Body: strings.NewReader(`{
@@ -50,11 +50,11 @@ func TestCalculatedFieldsSchemaGuard_BlocksMultiSelectRelation(t *testing.T) {
 
 			ExpectedContent: []string{
 				`"status":400`,
-				`Invalid schema: relation to calculated_fields must be single-select (maxSelect=1)`,
+				`Invalid schema: relation to _calculated_fields must be single-select (maxSelect=1)`,
 			},
 		},
 		{
-			Name:   "Schema guard: consente relation verso calculated_fields con maxSelect = 1",
+			Name:   "Schema guard: consente relation verso _calculated_fields con maxSelect = 1",
 			Method: http.MethodPost,
 			URL:    "/api/collections",
 			Body: strings.NewReader(`{
@@ -122,9 +122,9 @@ func TestCalculatedFieldsSchemaGuard_BlocksPatchToMultiSelectRelation_DirectSave
 	app := setupTestApp(t)
 	defer app.Cleanup()
 
-	cf, err := app.FindCollectionByNameOrId("calculated_fields")
+	cf, err := app.FindCollectionByNameOrId("_calculated_fields")
 	if err != nil {
-		t.Fatalf("cannot find calculated_fields: %v", err)
+		t.Fatalf("cannot find _calculated_fields: %v", err)
 	}
 
 	// 1) create collection with maxSelect=1
@@ -156,9 +156,9 @@ func TestCalculatedFieldsSchemaGuard_BlocksUpdateToMaxSelect2(t *testing.T) {
 	app := setupTestApp(t)
 	defer app.Cleanup()
 
-	cf, err := app.FindCollectionByNameOrId("calculated_fields")
+	cf, err := app.FindCollectionByNameOrId("_calculated_fields")
 	if err != nil {
-		t.Fatalf("cannot find calculated_fields: %v", err)
+		t.Fatalf("cannot find _calculated_fields: %v", err)
 	}
 
 	// 1) CREATE ok (maxSelect=1)
@@ -185,7 +185,7 @@ func TestCalculatedFieldsSchemaGuard_BlocksUpdateToMaxSelect2(t *testing.T) {
 	}
 
 	// (opzionale) check messaggio
-	if !strings.Contains(err.Error(), "relation to calculated_fields must be single-select") {
+	if !strings.Contains(err.Error(), "relation to _calculated_fields must be single-select") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -193,9 +193,9 @@ func TestCalculatedFieldsSchemaGuard_BlocksUpdateToMaxSelect2(t *testing.T) {
 func ensureCalculatedFieldsViewRule(t testing.TB, app *tests.TestApp) {
 	t.Helper()
 
-	cfCol, err := app.FindCollectionByNameOrId("calculated_fields")
+	cfCol, err := app.FindCollectionByNameOrId("_calculated_fields")
 	if err != nil {
-		t.Fatalf("cannot find calculated_fields collection: %v", err)
+		t.Fatalf("cannot find _calculated_fields collection: %v", err)
 	}
 
 	// add field allowed_view_admin if missing
@@ -223,7 +223,7 @@ func ensureCalculatedFieldsViewRule(t testing.TB, app *tests.TestApp) {
 	cfCol.ListRule = cfCol.ViewRule
 
 	if err := app.Save(cfCol); err != nil {
-		t.Fatalf("failed to update calculated_fields schema/rules: %v", err)
+		t.Fatalf("failed to update _calculated_fields schema/rules: %v", err)
 	}
 }
 
@@ -266,9 +266,9 @@ func ensureOwnerCollectionForUpdateGuard(t testing.TB, app *tests.TestApp, owner
 		Required: true,
 	})
 
-	cfCol, err := app.FindCollectionByNameOrId("calculated_fields")
+	cfCol, err := app.FindCollectionByNameOrId("_calculated_fields")
 	if err != nil {
-		t.Fatalf("cannot find calculated_fields collection: %v", err)
+		t.Fatalf("cannot find _calculated_fields collection: %v", err)
 	}
 
 	ownerCol.Fields.Add(&core.RelationField{
@@ -295,9 +295,9 @@ func ensureOwnerCollectionForUpdateGuard(t testing.TB, app *tests.TestApp, owner
 func createCF(t testing.TB, app *tests.TestApp, id, formula, ownerCol, ownerRow, ownerField, allowedViewAdmin string) *core.Record {
 	t.Helper()
 
-	cfCol, err := app.FindCollectionByNameOrId("calculated_fields")
+	cfCol, err := app.FindCollectionByNameOrId("_calculated_fields")
 	if err != nil {
-		t.Fatalf("cannot find calculated_fields: %v", err)
+		t.Fatalf("cannot find _calculated_fields: %v", err)
 	}
 
 	rec := core.NewRecord(cfCol)
@@ -310,7 +310,7 @@ func createCF(t testing.TB, app *tests.TestApp, id, formula, ownerCol, ownerRow,
 
 	// Save normale così popola depends_on (tramite i tuoi hook OnCalculatedFieldsCreateUpdate)
 	if err := app.Save(rec); err != nil {
-		t.Fatalf("failed to create calculated_fields/%s: %v", id, err)
+		t.Fatalf("failed to create _calculated_fields/%s: %v", id, err)
 	}
 	return rec
 }
@@ -359,7 +359,7 @@ func TestCalculatedFields_UpdateGuard_RequiresViewOnTransitiveDeps_AllowsWhenVie
 
 		token := getAuthToken(app, "administrators", "ut_allow")
 
-		superScenario.URL = "/api/collections/calculated_fields/records/" + aID
+		superScenario.URL = "/api/collections/_calculated_fields/records/" + aID
 		superScenario.Headers = map[string]string{"Authorization": token}
 		superScenario.Body = strings.NewReader(fmt.Sprintf(`{"formula":"%s + 5"}`, bID))
 		superScenario.ExpectedContent = []string{`"id":"` + aID + `"`}
@@ -408,7 +408,7 @@ func TestCalculatedFields_UpdateGuard_FailsWhenDirectDepNotViewable(t *testing.T
 		createCF(t, app, aID, fmt.Sprintf("%s + 1", bID), ownerCol, ownerId, "cf_a", updaterId)
 
 		token := getAuthToken(app, "administrators", "ut_allow2")
-		sc.URL = "/api/collections/calculated_fields/records/" + aID
+		sc.URL = "/api/collections/_calculated_fields/records/" + aID
 		sc.Headers = map[string]string{"Authorization": token}
 		sc.Body = strings.NewReader(fmt.Sprintf(`{"formula":"%s + 5"}`, bID))
 	}
@@ -451,14 +451,14 @@ func TestCalculatedFields_UpdateGuard_FailsWhenTransitiveDepNotViewable(t *testi
 
 		// chain: A -> B -> C
 		// updater can view B, but NOT C
-cID := "cfcvwno30000003" // 15
-bID := "cfbvwno30000003" // 15
-aID := "cfavwno30000003" // 15
+		cID := "cfcvwno30000003" // 15
+		bID := "cfbvwno30000003" // 15
+		aID := "cfavwno30000003" // 15
 		createCF(t, app, cID, "2", ownerCol, ownerId, "cf_c", otherId)
 		createCF(t, app, bID, fmt.Sprintf("%s + 1", cID), ownerCol, ownerId, "cf_b", updaterId)
 		createCF(t, app, aID, fmt.Sprintf("%s + 1", bID), ownerCol, ownerId, "cf_a", updaterId)
 		token := getAuthToken(app, "administrators", "ut_allow3")
-		sc.URL = "/api/collections/calculated_fields/records/" + aID
+		sc.URL = "/api/collections/_calculated_fields/records/" + aID
 		sc.Headers = map[string]string{"Authorization": token}
 		sc.Body = strings.NewReader(fmt.Sprintf(`{"formula":"%s + 5"}`, bID))
 	}

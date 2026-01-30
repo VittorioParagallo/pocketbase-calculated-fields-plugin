@@ -11,15 +11,15 @@ import (
 
 func CalculatedFieldsOwnersSchemaGuards(e *core.CollectionEvent) error {
 	// NB: usa e.App, non app, per restare nel contesto dell’evento
-	cf, err := e.App.FindCollectionByNameOrId("calculated_fields")
+	cf, err := e.App.FindCollectionByNameOrId("_calculated_fields")
 	if err != nil || cf == nil {
-		// prima install o calculated_fields non ancora presente
+		// prima install o _calculated_fields non ancora presente
 		return e.Next()
 	}
 	cfId := cf.Id
 
 	col := e.Collection
-	if col.Id == cfId || col.Name == "calculated_fields" {
+	if col.Id == cfId || col.Name == "_calculated_fields" {
 		return e.Next()
 	}
 
@@ -31,11 +31,11 @@ func CalculatedFieldsOwnersSchemaGuards(e *core.CollectionEvent) error {
 
 		if rf.CollectionId == cfId && rf.MaxSelect != 1 {
 			return apis.NewBadRequestError(
-				"Invalid schema: relation to calculated_fields must be single-select (maxSelect=1)",
+				"Invalid schema: relation to _calculated_fields must be single-select (maxSelect=1)",
 				validation.Errors{
 					rf.Name: validation.NewError(
-						"calculated_fields_relation_maxSelect",
-						"Relation fields pointing to calculated_fields must have maxSelect=1",
+						"_calculated_fields_relation_maxSelect",
+						"Relation fields pointing to _calculated_fields must have maxSelect=1",
 					),
 				},
 			)
@@ -47,7 +47,7 @@ func CalculatedFieldsOwnersSchemaGuards(e *core.CollectionEvent) error {
 
 func OnOwnerCreate_AutoCreateCalculatedFields(e *core.RecordEvent) error {
 	// evita loop: quando stai creando un calculated_field, NON creare altro
-	if e.Record != nil && e.Record.Collection() != nil && e.Record.Collection().Name == "calculated_fields" {
+	if e.Record != nil && e.Record.Collection() != nil && e.Record.Collection().Name == "_calculated_fields" {
 		return e.Next()
 	}
 
@@ -65,14 +65,14 @@ func OnOwnerCreate_AutoCreateCalculatedFields(e *core.RecordEvent) error {
 			return err
 		}
 
-		// 1) se non esiste calculated_fields, fine
-		cfCol, err := txApp.FindCollectionByNameOrId("calculated_fields")
+		// 1) se non esiste _calculated_fields, fine
+		cfCol, err := txApp.FindCollectionByNameOrId("_calculated_fields")
 		if err != nil || cfCol == nil {
 			return nil
 		}
 		cfColId := cfCol.Id
 
-		// 2) per ogni relation field dell'owner che punta a calculated_fields
+		// 2) per ogni relation field dell'owner che punta a _calculated_fields
 		for _, f := range ownerCol.Fields {
 			rel, ok := f.(*core.RelationField)
 			if !ok {
@@ -91,7 +91,7 @@ func OnOwnerCreate_AutoCreateCalculatedFields(e *core.RecordEvent) error {
 			if hasVal {
 				// ✅ anti-hijack: deve esistere e deve appartenere a QUESTO owner/field
 				cfID := ids[0]
-				cfRec, err := txApp.FindRecordById("calculated_fields", cfID)
+				cfRec, err := txApp.FindRecordById("_calculated_fields", cfID)
 				if err != nil {
 					return apis.NewBadRequestError("Invalid calculated_field reference", validation.Errors{
 						fieldName: validation.NewError("1011",
@@ -139,17 +139,17 @@ func OnOwnerCreate_AutoCreateCalculatedFields(e *core.RecordEvent) error {
 
 // BindCalculatedFieldsGenericCascadeDelete:
 // - intercetta la DELETE di QUALSIASI record (tutte le collection)
-// - se quel record ha campi relation verso la collection calculated_fields,
-//   cancella prima i record calculated_fields referenziati (triggerando OnCalculatedFieldsDelete)
+// - se quel record ha campi relation verso la collection _calculated_fields,
+//   cancella prima i record _calculated_fields referenziati (triggerando OnCalculatedFieldsDelete)
 // - poi procede con la delete dell'owner.
 //
 // Assunzione plugin:
-// - le relation verso calculated_fields sono SINGLE select (maxSelect=1)
+// - le relation verso _calculated_fields sono SINGLE select (maxSelect=1)
 // - se un owner referenzia un CF, quel CF deve esistere (integrità demandata a PocketBase)
 
 func OnOwnerDelete_AutoDeleteCalculatedFields(e *core.RecordEvent) error {
 	// evita loop: quando stai cancellando un calculated_field, NON fare cascade su se stesso
-	if e.Record != nil && e.Record.Collection() != nil && e.Record.Collection().Name == "calculated_fields" {
+	if e.Record != nil && e.Record.Collection() != nil && e.Record.Collection().Name == "_calculated_fields" {
 		return e.Next()
 	}
 
@@ -162,8 +162,8 @@ func OnOwnerDelete_AutoDeleteCalculatedFields(e *core.RecordEvent) error {
 	return originalApp.RunInTransaction(func(txApp core.App) error {
 		e.App = txApp
 
-		// se non esiste calculated_fields, non c'è nulla da fare
-		cfCol, err := txApp.FindCollectionByNameOrId("calculated_fields")
+		// se non esiste _calculated_fields, non c'è nulla da fare
+		cfCol, err := txApp.FindCollectionByNameOrId("_calculated_fields")
 		if err != nil {
 			return e.Next()
 		}
@@ -172,7 +172,7 @@ func OnOwnerDelete_AutoDeleteCalculatedFields(e *core.RecordEvent) error {
 		seen := map[string]struct{}{}
 		cfIDs := make([]string, 0, 4)
 
-		// 1) trova tutte le relation dell'owner che puntano a calculated_fields
+		// 1) trova tutte le relation dell'owner che puntano a _calculated_fields
 		for _, f := range ownerCol.Fields {
 			rel, ok := f.(*core.RelationField)
 			if !ok {
@@ -198,10 +198,10 @@ func OnOwnerDelete_AutoDeleteCalculatedFields(e *core.RecordEvent) error {
 
 		// 2) cancella i CF referenziati (deve triggerare OnCalculatedFieldsDelete)
 		for _, id := range cfIDs {
-			cfRec, err := txApp.FindRecordById("calculated_fields", id)
+			cfRec, err := txApp.FindRecordById("_calculated_fields", id)
 			if err != nil {
 				return apis.NewBadRequestError("Cascade delete failed", validation.Errors{
-					"calculated_fields": validation.NewError("1008",
+					"_calculated_fields": validation.NewError("1008",
 						fmt.Sprintf(
 							"Cascade delete: calculated_field %q referenced by %s/%s not found.",
 							id, ownerCol.Name, e.Record.Id,
@@ -269,7 +269,7 @@ func CalculatedFieldsUpdateRequestGuard(e *core.RecordRequestEvent) error {
 			}
 		}
 
-		e.App.Logger().Warn("calculated_fields update forbidden: cannot update owner",
+		e.App.Logger().Warn("_calculated_fields update forbidden: cannot update owner",
 			"cfId", cf.Id,
 			"ownerCollection", ownerCol,
 			"ownerRow", ownerRow,
@@ -280,7 +280,7 @@ func CalculatedFieldsUpdateRequestGuard(e *core.RecordRequestEvent) error {
 
 		return e.ForbiddenError(
 			fmt.Sprintf(
-				"Forbidden updating calculated_fields/%s: user %s/%s has no update access to owner %s/%s",
+				"Forbidden updating _calculated_fields/%s: user %s/%s has no update access to owner %s/%s",
 				cf.Id, authCol, authId, ownerCol, ownerRow,
 			),
 			ruleErr,
@@ -299,10 +299,10 @@ func CalculatedFieldsUpdateRequestGuard(e *core.RecordRequestEvent) error {
 		})
 	}
 	if len(startIds) > 0 {
-		startRecs, err := e.App.FindRecordsByIds("calculated_fields", startIds)
+		startRecs, err := e.App.FindRecordsByIds("_calculated_fields", startIds)
 		if err != nil {
 			return apis.NewBadRequestError("Formula dependency error", validation.Errors{
-				"formula": validation.NewError("1007", fmt.Sprintf("Failed to load referenced calculated_fields: %v", err)),
+				"formula": validation.NewError("1007", fmt.Sprintf("Failed to load referenced _calculated_fields: %v", err)),
 			})
 		}
 
@@ -377,14 +377,14 @@ func assertDepsViewableTransitive(
 			ok, rerr := app.CanAccessRecord(cur, requestInfo, rule)
 			if rerr != nil {
 				return apis.NewInternalServerError(
-					fmt.Sprintf("Failed to evaluate view access for calculated_fields/%s", cur.Id),
+					fmt.Sprintf("Failed to evaluate view access for _calculated_fields/%s", cur.Id),
 					rerr,
 				)
 			}
 			if !ok {
 				return apis.NewForbiddenError(
 					fmt.Sprintf(
-						"Forbidden: user %s/%s has no view access to dependency calculated_fields/%s",
+						"Forbidden: user %s/%s has no view access to dependency _calculated_fields/%s",
 						authCol, authId, cur.Id,
 					),
 					nil,
@@ -398,7 +398,7 @@ func assertDepsViewableTransitive(
 			continue
 		}
 
-		parents, err := app.FindRecordsByIds("calculated_fields", parentIds)
+		parents, err := app.FindRecordsByIds("_calculated_fields", parentIds)
 		if err != nil {
 			return apis.NewBadRequestError(
 				"Formula dependency error: referenced record not found",
@@ -440,7 +440,7 @@ func CalculatedFieldsViewRequestGuard(e *core.RecordRequestEvent) error {
 	ownerRec, err := e.App.FindRecordById(ownerCol, ownerRow)
 	if err != nil {
 		return e.ForbiddenError(
-			fmt.Sprintf("Forbidden viewing calculated_fields/%s: owner %s/%s not found", cf.Id, ownerCol, ownerRow),
+			fmt.Sprintf("Forbidden viewing _calculated_fields/%s: owner %s/%s not found", cf.Id, ownerCol, ownerRow),
 			err,
 		)
 	}
@@ -448,7 +448,7 @@ func CalculatedFieldsViewRequestGuard(e *core.RecordRequestEvent) error {
 	reqInfo, reqErr := e.RequestInfo()
 	if reqErr != nil {
 		return apis.NewInternalServerError(
-			fmt.Sprintf("Failed to retrieve request info while viewing calculated_fields/%s (owner=%s/%s)", cf.Id, ownerCol, ownerRow),
+			fmt.Sprintf("Failed to retrieve request info while viewing _calculated_fields/%s (owner=%s/%s)", cf.Id, ownerCol, ownerRow),
 			reqErr,
 		)
 	}
@@ -464,7 +464,7 @@ func CalculatedFieldsViewRequestGuard(e *core.RecordRequestEvent) error {
 			}
 		}
 
-		e.App.Logger().Warn("calculated_fields view forbidden: cannot view owner",
+		e.App.Logger().Warn("_calculated_fields view forbidden: cannot view owner",
 			"cfId", cf.Id,
 			"ownerCollection", ownerCol,
 			"ownerRow", ownerRow,
@@ -474,7 +474,7 @@ func CalculatedFieldsViewRequestGuard(e *core.RecordRequestEvent) error {
 		)
 
 		return e.ForbiddenError(
-			fmt.Sprintf("Forbidden viewing calculated_fields/%s: user %s/%s has no view access to owner %s/%s",
+			fmt.Sprintf("Forbidden viewing _calculated_fields/%s: user %s/%s has no view access to owner %s/%s",
 				cf.Id, authCol, authId, ownerCol, ownerRow,
 			),
 			ruleErr,
@@ -486,7 +486,7 @@ func CalculatedFieldsViewRequestGuard(e *core.RecordRequestEvent) error {
 	masked, blockedAt, maskErr := maskIfDepsNotViewable(e.App, reqInfo, cf)
 	if maskErr != nil {
 		return apis.NewInternalServerError(
-			fmt.Sprintf("Failed to evaluate dependency access while viewing calculated_fields/%s", cf.Id),
+			fmt.Sprintf("Failed to evaluate dependency access while viewing _calculated_fields/%s", cf.Id),
 			maskErr,
 		)
 	}
@@ -508,7 +508,7 @@ func CalculatedFieldsListRequestGuard(e *core.RecordsListRequestEvent) error {
 	reqInfo, reqErr := e.RequestInfo()
 	if reqErr != nil {
 		return apis.NewInternalServerError(
-			"Failed to retrieve request info while listing calculated_fields",
+			"Failed to retrieve request info while listing _calculated_fields",
 			reqErr,
 		)
 	}
@@ -545,7 +545,7 @@ func CalculatedFieldsListRequestGuard(e *core.RecordsListRequestEvent) error {
 		}
 
 		if masked {
-		cf.Set("value", "\"#AUTH!\"")
+			cf.Set("value", "\"#AUTH!\"")
 			cf.Set(
 				"error",
 				fmt.Sprintf(

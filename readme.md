@@ -2,7 +2,7 @@
 
 This plugin adds **server-side calculated fields** to PocketBase collections.
 
-Each calculated field is a record in the `calculated_fields` collection and is always attached to a real **owner record** (for example: `booking_queue`, or any other collection).
+Each calculated field is a record in the `_calculated_fields` collection and is always attached to a real **owner record** (for example: `booking_queue`, or any other collection).
 
 Formulas are automatically evaluated, dependency graphs are built, and updates propagate transactionally across dependent calculated fields — similar to spreadsheet behavior, but fully integrated with PocketBase collections, permissions and hooks.
 
@@ -35,14 +35,14 @@ A calculated field is defined by:
 
 ## 📂 Data Model
 
-Collection: **`calculated_fields`**
+Collection: **`_calculated_fields`**
 
 | Field | Type | Description |
 |------|------|-------------|
 | `formula` | text | Expression evaluated with expr-lang |
 | `value` | json | Computed value |
 | `error` | text | Error message if evaluation fails |
-| `depends_on` | relation (self) | Referenced calculated_fields |
+| `depends_on` | relation (self) | Referenced _calculated_fields |
 | `owner_collection` | text | Collection name of the owner |
 | `owner_row` | text | Record ID of the owner |
 | `owner_field` | text | Field name in the owner record |
@@ -59,7 +59,7 @@ Each calculated field belongs to exactly **one owner record**.
 go run .
 ```
 then you can create any collection with a relation field to calculated_field. You should immagine the calculated field like a merged field in the owner collection and not care about the external table.
-If you import the code in your project make sure to create a calculated_fields table like:
+If you import the code in your project make sure to create a _calculated_fields table like:
 ```
 {
   "id": "pbc_2828438558",
@@ -68,7 +68,7 @@ If you import the code in your project make sure to create a calculated_fields t
   "createRule": null,
   "updateRule": "@request.auth.id != \"\"",
   "deleteRule": null,
-  "name": "calculated_fields",
+  "name": "_calculated_fields",
   "type": "base",
   "fields": [
     {
@@ -200,10 +200,10 @@ If you import the code in your project make sure to create a calculated_fields t
     }
   ],
   "indexes": [
-    "CREATE UNIQUE INDEX `idx_YNg4iO7WjN` ON `calculated_fields` (\n  `owner_collection`,\n  `owner_row`,\n  `owner_field`\n)",
-    "CREATE INDEX `idx_mEyneRsYiH` ON `calculated_fields` (`owner_row`)",
-    "CREATE INDEX `idx_6f4JzAzWdy` ON `calculated_fields` (`owner_collection`)",
-    "CREATE INDEX `idx_hIue6Y0lhZ` ON `calculated_fields` (`owner_field`)"
+    "CREATE UNIQUE INDEX `idx_YNg4iO7WjN` ON `_calculated_fields` (\n  `owner_collection`,\n  `owner_row`,\n  `owner_field`\n)",
+    "CREATE INDEX `idx_mEyneRsYiH` ON `_calculated_fields` (`owner_row`)",
+    "CREATE INDEX `idx_6f4JzAzWdy` ON `_calculated_fields` (`owner_collection`)",
+    "CREATE INDEX `idx_hIue6Y0lhZ` ON `_calculated_fields` (`owner_field`)"
   ],
   "created": "2025-11-01 18:50:58.367Z",
   "updated": "2026-01-17 22:53:30.111Z",
@@ -212,20 +212,20 @@ If you import the code in your project make sure to create a calculated_fields t
 ```
 ---
 
-### 2️⃣ 🧠 Automatic Owner Synchronization (Collections → calculated_fields)
+### 2️⃣ 🧠 Automatic Owner Synchronization (Collections → _calculated_fields)
 
-One of the core features of this plugin is the automatic synchronization between any collection and the calculated_fields collection.
+One of the core features of this plugin is the automatic synchronization between any collection and the _calculated_fields collection.
 
-Whenever a record is created or updated in a collection that contains a relation field pointing to calculated_fields, the plugin automatically manages the lifecycle of the corresponding calculated field record.
+Whenever a record is created or updated in a collection that contains a relation field pointing to _calculated_fields, the plugin automatically manages the lifecycle of the corresponding calculated field record.
 
-This makes calculated_fields behave like a true computed field attached to another collection, rather than a standalone table.
+This makes _calculated_fields behave like a true computed field attached to another collection, rather than a standalone table.
 
-🔹 Automatic creation of calculated_fields records
+🔹 Automatic creation of _calculated_fields records
 
-If a collection contains a relation field referencing calculated_fields (for example: min_fx, max_fx, act_fx, etc.):
+If a collection contains a relation field referencing _calculated_fields (for example: min_fx, max_fx, act_fx, etc.):
 
 When a new record is created in that collection:
-	•	the plugin automatically creates a corresponding record in calculated_fields
+	•	the plugin automatically creates a corresponding record in _calculated_fields
 	•	links it back to the owner record
 	•	initializes its formula and metadata
 	•	sets ownership information
@@ -235,15 +235,15 @@ This happens transparently inside the same database transaction.
 Example:
 
 Collection: booking_queue
-Field: min_fx → relation to calculated_fields
+Field: min_fx → relation to _calculated_fields
 
 When you create a new booking_queue record:
 booking_queue
- └─ min_fx → calculated_fields record is automatically created
+ └─ min_fx → _calculated_fields record is automatically created
 
 ### 3️⃣ Edit a calculated field formula
 
-Open the `calculated_fields` collection and update:
+Open the `_calculated_fields` collection and update:
 
 ```text
 formula = 2 + 3
@@ -341,7 +341,7 @@ This makes calculated fields behave like **true computed properties** of the own
 
 When an owner record is deleted:
 
-- all its calculated_fields are deleted automatically  
+- all its _calculated_fields are deleted automatically  
 - dependent formulas are rewritten to `#REF!`  
 - errors propagate safely  
 

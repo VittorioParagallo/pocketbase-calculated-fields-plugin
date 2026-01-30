@@ -3,7 +3,7 @@ package tests
 import (
 	"encoding/json"
 	"fmt"
-	"myapp/hooks"
+	"calculatedfields/hooks"
 	"net/http"
 	"reflect"
 	"sort"
@@ -20,14 +20,14 @@ func TestComputedFieldsCreateFxCalculations(t *testing.T) {
 	//t.Parallel()
 	autApp, _ := tests.NewTestApp("../pb_data")
 
-superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autApp)}
-	
+	superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autApp)}
+
 	scenarios := []tests.ApiScenario{
 
 		{
 			Name:   "Calcolo formula costante",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "testcoll_abc123_constant",
   "formula": "42 + 8",
@@ -48,7 +48,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Calcolo formula da campo esistente",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_test_from_db_dependent",
   "formula": "booking_queue_queue_b00000002_act + 2",
@@ -68,7 +68,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Errore: self-reference esplicita su se stesso",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_self_ref_node_value",
   "formula": "booking_queue_self_ref_node_value + 1",
@@ -87,7 +87,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Errore: formula malformata (sintassi non valida)",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_syntax_error_node_value",
   "formula": "1 + * 2",
@@ -106,7 +106,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Errore: riferimento a campo o record inesistente",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_missing_ref_test_value",
   "formula": "booking_queue_nonexistent_record_act + 10",
@@ -123,7 +123,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Errore: somma tra numero e stringa",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_queue_b00000002_invalidsum",
   "formula": "booking_queue_queue_b00000002_act + \"abc\"",
@@ -142,7 +142,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Errore: divisione per zero",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_test_from_db_divzero",
   "formula": "10 / 0",
@@ -161,7 +161,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Errore: formula con caratteri speciali o unicode non validi",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_test_from_db_unicode",
   "formula": "booking_queue_queue_b00000002_act + 💥",
@@ -180,7 +180,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Dipendenza incrociata valida tra due calcolati",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_queue_c00000000_cross_dep_test",
   "formula": "booking_queue_queue_b00000002_min + booking_queue_queue_c00000000_max",
@@ -200,7 +200,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Dipendenza incrociata su tre livelli",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_queue_d00000001_triple_dep_test",
   "formula": "booking_queue_queue_a00000001_min + booking_queue_queue_c00000000_max",
@@ -221,7 +221,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Errore: somma con campo null",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_queue_d00000001_null_dep_test",
   "formula": "1 + foo_bar_baz",
@@ -241,7 +241,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Errore: uso di funzione non supportata",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_queue_d00000001_unsupported_func",
   "formula": "exec(\"rm -rf /\")",
@@ -260,7 +260,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Errore: funzione con argomenti non validi",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_queue_d00000001_invalid_args",
   "formula": "sum()",
@@ -278,7 +278,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Errore: formula con caratteri non ASCII o simboli non validi",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_queue_d00000001_invalid_chars",
   "formula": "booking_queue_queue_a00000001_min + 🚀",
@@ -297,7 +297,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Errore: formula che tenta operazione aritmetica su campo array",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_queue_d00000001_array_misuse",
   "formula": "booking_queue_v7tex6i3v4w6hs0_linked_bookings + 1",
@@ -316,7 +316,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Calcolo con funzione len() su campo linked_bookings",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_queue_d00000001_len_test",
   "formula": "len(booking_queue_v7tex6i3v4w6hs0_linked_bookings)",
@@ -337,7 +337,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Calcolo con funzione any() su campo linked_bookings",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_queue_d00000001_contains_test",
   "formula": "\"booking00000001\" in booking_queue_v7tex6i3v4w6hs0_linked_bookings",
@@ -357,7 +357,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Calcolo con if { ... } else { ... } su campo linked_bookings",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_queue_d00000001_if_test",
   "formula": "if \"booking00000001\" in booking_queue_v7tex6i3v4w6hs0_linked_bookings { 100 } else { 0 }",
@@ -377,7 +377,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Calcolo con operatore ternario su campo linked_bookings",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_queue_d00000001_ternary_test",
   "formula": "\"booking00000001\" in booking_queue_v7tex6i3v4w6hs0_linked_bookings ? 100 : 0",
@@ -397,7 +397,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Calcolo con funzioni min, max e sum su array numerico",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_queue_d00000001_aggregate_funcs",
   "formula": "sum([1, 2, 3]) + min([5, 2, 9]) + max([4, 8, 1])",
@@ -418,7 +418,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Calcolo con funzioni aggregate su valori da record",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_queue_d00000001_aggregate_records",
   "formula": "sum([booking_queue_queue_a00000001_min, booking_queue_queue_b00000002_min, booking_queue_queue_c00000000_max])",
@@ -438,7 +438,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Calcolo con max() tra due record",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_queue_d00000001_test_max",
   "formula": "max(booking_queue_queue_a00000001_min, booking_queue_queue_b00000002_min)",
@@ -457,7 +457,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Calcolo con sum(len(), costante)",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_queue_d00000001_sum_len_constant",
   "formula": "sum([len(booking_queue_v7tex6i3v4w6hs0_linked_bookings), 7])",
@@ -477,7 +477,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Calcolo con sum([max(), costante])",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_queue_d00000001_sum_max_test",
   "formula": "sum([max(3, 7), 5])",
@@ -498,7 +498,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Calcolo con sum([min(), campo esistente])",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_queue_d00000001_sum_min_test",
   "formula": "sum([min(2, 4), booking_queue_queue_b00000002_act])",
@@ -518,7 +518,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Calcolo con sum([if(condizione){...}else{...}, costante])",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_queue_d00000001_sum_if_block_test",
   "formula": "sum([if booking_queue_queue_a00000001_min > 3 { 10 } else { 0 }, 5])",
@@ -538,7 +538,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Calcolo con sum e formule annidate (len, max, if, costante)",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_queue_d00000001_nested_formula_test",
   "formula": "sum([len(booking_queue_v7tex6i3v4w6hs0_linked_bookings),max(booking_queue_queue_a00000001_min,booking_queue_queue_b00000002_min),10,if booking_queue_queue_c00000000_max > 10 { 100 } else { 0 }])",
@@ -557,7 +557,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Calcolo concatenazione stringhe da più record",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_queue_concat1234_min",
   "formula": "string(booking_queue_queue_a00000001_min) + \"‑\" + string(booking_queue_queue_b00000002_min)",
@@ -576,7 +576,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Calcolo data + 3 giorni",
 			Method: http.MethodPost,
-			URL:    "/api/collections/calculated_fields/records",
+			URL:    "/api/collections/_calculated_fields/records",
 			Body: strings.NewReader(`{
   "id": "booking_queue_queue_date_plus3_date",
   "formula": "date(booking_queue_queue_date_test_date) + duration(\"72h\")",
@@ -605,15 +605,15 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 func TestComputedFieldsUpdateFxCalculations(t *testing.T) {
 	//t.Parallel()
 	autApp, _ := tests.NewTestApp("../pb_data")
-	
-superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autApp)}
+
+	superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autApp)}
 
 	scenarios := []tests.ApiScenario{
 
 		{
 			Name:   "Update formula valida su record esistente booking_queue_queue_zb3456789_min",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/calculated_fields/records/booking_queue_queue_zb3456789_min",
+			URL:    "/api/collections/_calculated_fields/records/booking_queue_queue_zb3456789_min",
 			Body: strings.NewReader(`{
 		"formula": "booking_queue_queue_zc4567890_min + 10"
 	}`),
@@ -628,7 +628,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		}, {
 			Name:   "Errore: Update con formula malformata",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/calculated_fields/records/booking_queue_queue_zb3456789_min",
+			URL:    "/api/collections/_calculated_fields/records/booking_queue_queue_zb3456789_min",
 			Body: strings.NewReader(`{
 		"formula": "1 + * 2"
 	}`),
@@ -642,7 +642,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Update e propagazione a campo dipendente",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/calculated_fields/records/booking_queue_queue_zb3456789_min",
+			URL:    "/api/collections/_calculated_fields/records/booking_queue_queue_zb3456789_min",
 			Body: strings.NewReader(`{
 		"formula": "2"
 	}`),
@@ -658,7 +658,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Update nodo base con propagazione su catena profonda",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/calculated_fields/records/booking_queue_queue_a00000001_min",
+			URL:    "/api/collections/_calculated_fields/records/booking_queue_queue_a00000001_min",
 			Body: strings.NewReader(`{
 		"formula": "6"
 	}`),
@@ -685,7 +685,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		}, {
 			Name:   "Update formula rimuovendo un riferimento e verifica depends_on",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/calculated_fields/records/booking_queue_queue_c00000000_min",
+			URL:    "/api/collections/_calculated_fields/records/booking_queue_queue_c00000000_min",
 			Body: strings.NewReader(`{
         "formula": "booking_queue_queue_b00000002_min + 4"
     }`),
@@ -702,7 +702,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:   "Update con aggiunta nuova dipendenza",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/calculated_fields/records/booking_queue_queue_root00001_min",
+			URL:    "/api/collections/_calculated_fields/records/booking_queue_queue_root00001_min",
 			Body: strings.NewReader(`{
 		"formula": "booking_queue_queue_a00000001_min + 1"
 	}`),
@@ -719,7 +719,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:           "Errore su ciclo indiretto tra record",
 			Method:         http.MethodPatch,
-			URL:            "/api/collections/calculated_fields/records/booking_queue_queue_a00000001_min",
+			URL:            "/api/collections/_calculated_fields/records/booking_queue_queue_a00000001_min",
 			Body:           strings.NewReader(`{"formula": "booking_queue_queue_c00000000_min + 1"}`),
 			Headers:        superAuthHeader,
 			TestAppFactory: setupTestApp,
@@ -732,7 +732,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:           "Errore su funzione con tipo errato (sum su int e non con array come argomento)",
 			Method:         http.MethodPatch,
-			URL:            "/api/collections/calculated_fields/records/booking_queue_queue_zc4567890_min",
+			URL:            "/api/collections/_calculated_fields/records/booking_queue_queue_zc4567890_min",
 			Body:           strings.NewReader(`{"formula": "sum(5)"}`),
 			Headers:        superAuthHeader,
 			TestAppFactory: setupTestApp,
@@ -743,7 +743,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		}, {
 			Name:   "Errore su formula con identificatore inesistente",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/calculated_fields/records/booking_queue_queue_zc4567890_min",
+			URL:    "/api/collections/_calculated_fields/records/booking_queue_queue_zc4567890_min",
 			Body: strings.NewReader(`{
 		"formula": "not_existing_record.min + 1"
 	}`),
@@ -756,7 +756,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		}, {
 			Name:   "Errore su formula con dipendenza diretta da se stesso",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/calculated_fields/records/booking_queue_queue_zc4567890_min",
+			URL:    "/api/collections/_calculated_fields/records/booking_queue_queue_zc4567890_min",
 			Body: strings.NewReader(`{
 		"formula": "booking_queue_queue_zc4567890_min + 1"
 	}`),
@@ -770,7 +770,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		}, {
 			Name:   "Update rimuove tutte le dipendenze (formula statica)",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/calculated_fields/records/booking_queue_queue_zb3456789_min",
+			URL:    "/api/collections/_calculated_fields/records/booking_queue_queue_zb3456789_min",
 			Body: strings.NewReader(`{
 		"formula": "42"
 	}`),
@@ -787,7 +787,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:           "Fix formula clears previous error and updates value",
 			Method:         http.MethodPatch,
-			URL:            "/api/collections/calculated_fields/records/booking_queue_error_reset_test_min",
+			URL:            "/api/collections/_calculated_fields/records/booking_queue_error_reset_test_min",
 			Headers:        superAuthHeader,
 			TestAppFactory: setupTestApp,
 			Body:           strings.NewReader(`{"formula": "5 + 1"}`),
@@ -810,7 +810,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:           "Manual #REF! formula is preserved and error is reset",
 			Method:         http.MethodPatch,
-			URL:            "/api/collections/calculated_fields/records/booking_queue_queue_b89101213_min",
+			URL:            "/api/collections/_calculated_fields/records/booking_queue_queue_b89101213_min",
 			Headers:        superAuthHeader,
 			TestAppFactory: setupTestApp,
 			Body:           strings.NewReader(`{"formula": "#REF! + 1"}`),
@@ -821,7 +821,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 				`"value":"#REF!"`,
 			},
 			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
-				record, err := app.FindRecordById("calculated_fields", "booking_queue_queue_b89101213_min")
+				record, err := app.FindRecordById("_calculated_fields", "booking_queue_queue_b89101213_min")
 				if err != nil {
 					t.Fatalf("Errore nel recupero del record aggiornato: %v", err)
 				}
@@ -844,7 +844,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:           "Update formula fixes previous syntax error (#REF! state)",
 			Method:         http.MethodPatch,
-			URL:            "/api/collections/calculated_fields/records/booking_queue_error_reset_test_min",
+			URL:            "/api/collections/_calculated_fields/records/booking_queue_error_reset_test_min",
 			Body:           strings.NewReader(`{"formula": "5 + 1"}`),
 			Headers:        superAuthHeader,
 			TestAppFactory: setupTestApp,
@@ -867,7 +867,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:           "Update formula fixes division by zero error",
 			Method:         http.MethodPatch,
-			URL:            "/api/collections/calculated_fields/records/rec_divzero_err",
+			URL:            "/api/collections/_calculated_fields/records/rec_divzero_err",
 			Body:           strings.NewReader(`{"formula": "10 / 2"}`),
 			Headers:        superAuthHeader,
 			TestAppFactory: setupTestApp,
@@ -890,7 +890,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:           "Update formula fixes invalid type operation (#VALUE!)",
 			Method:         http.MethodPatch,
-			URL:            "/api/collections/calculated_fields/records/inval_types_sum",
+			URL:            "/api/collections/_calculated_fields/records/inval_types_sum",
 			Body:           strings.NewReader(`{"formula": "1 + 2"}`),
 			Headers:        superAuthHeader,
 			TestAppFactory: setupTestApp,
@@ -913,7 +913,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:           "Update not prsisted if #REF! error not resolved",
 			Method:         http.MethodPatch,
-			URL:            "/api/collections/calculated_fields/records/bad_refer_to_fx",
+			URL:            "/api/collections/_calculated_fields/records/bad_refer_to_fx",
 			Body:           strings.NewReader(`{"formula": "missing_ref + 3"}`),
 			Headers:        superAuthHeader,
 			TestAppFactory: setupTestApp,
@@ -935,7 +935,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:           "Solving rec_divzero_err (A) propagates to correct dep_from_divzero_rec value",
 			Method:         http.MethodPatch,
-			URL:            "/api/collections/calculated_fields/records/rec_divzero_err",
+			URL:            "/api/collections/_calculated_fields/records/rec_divzero_err",
 			Body:           strings.NewReader(`{"formula":"10 / 2"}`),
 			Headers:        superAuthHeader,
 			TestAppFactory: setupTestApp,
@@ -955,7 +955,7 @@ superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autAp
 		{
 			Name:           "Update A propaga ad A, B, C e D correttamente con D che dipende da A e da C",
 			Method:         http.MethodPatch,
-			URL:            "/api/collections/calculated_fields/records/booking_queue_queue_a00000001_min",
+			URL:            "/api/collections/_calculated_fields/records/booking_queue_queue_a00000001_min",
 			Body:           strings.NewReader(`{"formula": "8"}`), // esempio: cambiamo A a 8
 			Headers:        superAuthHeader,
 			TestAppFactory: setupTestApp,
@@ -989,7 +989,7 @@ func TestComputedFieldsDeleteFxUpdatesDependents(t *testing.T) {
 		{
 			Name:           "tries to delete without auth",
 			Method:         http.MethodDelete,
-			URL:            "/api/collections/calculated_fields/records/booking_queue_queue_b00000002_min",
+			URL:            "/api/collections/_calculated_fields/records/booking_queue_queue_b00000002_min",
 			Headers:        superAuthHeader,
 			TestAppFactory: setupTestApp,
 			ExpectedStatus: 204,
@@ -997,7 +997,7 @@ func TestComputedFieldsDeleteFxUpdatesDependents(t *testing.T) {
 		{
 			Name:           "Delete node with dependents triggers formula replacement",
 			Method:         http.MethodDelete,
-			URL:            "/api/collections/calculated_fields/records/booking_queue_queue_b00000002_min",
+			URL:            "/api/collections/_calculated_fields/records/booking_queue_queue_b00000002_min",
 			Headers:        superAuthHeader,
 			TestAppFactory: setupTestApp,
 			ExpectedStatus: 204,
@@ -1006,7 +1006,7 @@ func TestComputedFieldsDeleteFxUpdatesDependents(t *testing.T) {
 				checkFormulaUpdate(t, app, "booking_queue_queue_c00000000_min", "#REF! + 2", "\"#REF!\"", "Formula contains reference to missing node (#REF!)")
 
 				// Verifica che il record eliminato non esista più
-				_, err := app.FindRecordById("calculated_fields", "booking_queue_queue_b00000002_min")
+				_, err := app.FindRecordById("_calculated_fields", "booking_queue_queue_b00000002_min")
 				if err == nil {
 					t.Fatalf("Expected record booking_queue_queue_b00000002_min to be deleted, but it still exists.")
 				}
@@ -1015,7 +1015,7 @@ func TestComputedFieldsDeleteFxUpdatesDependents(t *testing.T) {
 		{
 			Name:           "Delete base node updates chain of dependents",
 			Method:         http.MethodDelete,
-			URL:            "/api/collections/calculated_fields/records/booking_queue_queue_a00000001_min",
+			URL:            "/api/collections/_calculated_fields/records/booking_queue_queue_a00000001_min",
 			Headers:        superAuthHeader,
 			TestAppFactory: setupTestApp,
 			ExpectedStatus: 204,
@@ -1035,7 +1035,7 @@ func TestComputedFieldsDeleteFxUpdatesDependents(t *testing.T) {
 					"Reference to deleted node")
 
 				// Verifica che il nodo eliminato non esista più
-				_, err := app.FindRecordById("calculated_fields", "booking_queue_queue_a00000001_min")
+				_, err := app.FindRecordById("_calculated_fields", "booking_queue_queue_a00000001_min")
 				if err == nil {
 					t.Fatalf("Expected record booking_queue_queue_a00000001_min to be deleted, but it still exists")
 				}
@@ -1045,7 +1045,7 @@ func TestComputedFieldsDeleteFxUpdatesDependents(t *testing.T) {
 		{
 			Name:           "Delete node with single dependent updates that dependent",
 			Method:         http.MethodDelete,
-			URL:            "/api/collections/calculated_fields/records/booking_queue_queue_b00000002_min",
+			URL:            "/api/collections/_calculated_fields/records/booking_queue_queue_b00000002_min",
 			Headers:        superAuthHeader,
 			TestAppFactory: setupTestApp,
 			ExpectedStatus: 204,
@@ -1058,7 +1058,7 @@ func TestComputedFieldsDeleteFxUpdatesDependents(t *testing.T) {
 					"Formula contains reference to missing node (#REF!)")
 
 				// Verifica che il nodo eliminato non esista più
-				_, err := app.FindRecordById("calculated_fields", "booking_queue_queue_b00000002_min")
+				_, err := app.FindRecordById("_calculated_fields", "booking_queue_queue_b00000002_min")
 				if err == nil {
 					t.Fatalf("Expected record booking_queue_queue_b00000002_min to be deleted, but it still exists")
 				}
@@ -1067,7 +1067,7 @@ func TestComputedFieldsDeleteFxUpdatesDependents(t *testing.T) {
 		{
 			Name:           "Delete base node in deep chain updates all dependents correctly",
 			Method:         http.MethodDelete,
-			URL:            "/api/collections/calculated_fields/records/booking_queue_queue_a00000001_min",
+			URL:            "/api/collections/_calculated_fields/records/booking_queue_queue_a00000001_min",
 			Headers:        superAuthHeader,
 			TestAppFactory: setupTestApp,
 			ExpectedStatus: 204,
@@ -1087,7 +1087,7 @@ func TestComputedFieldsDeleteFxUpdatesDependents(t *testing.T) {
 					"Reference to deleted node")
 
 				// Verifica eliminazione del nodo originale
-				_, err := app.FindRecordById("calculated_fields", "booking_queue_queue_a00000001_min")
+				_, err := app.FindRecordById("_calculated_fields", "booking_queue_queue_a00000001_min")
 				if err == nil {
 					t.Fatalf("Expected record booking_queue_queue_a00000001_min to be deleted, but it still exists")
 				}
@@ -1097,7 +1097,7 @@ func TestComputedFieldsDeleteFxUpdatesDependents(t *testing.T) {
 		{
 			Name:           "Delete base node in 4‑level dependency chain updates all dependents correctly",
 			Method:         http.MethodDelete,
-			URL:            "/api/collections/calculated_fields/records/booking_queue_queue_a00000001_max",
+			URL:            "/api/collections/_calculated_fields/records/booking_queue_queue_a00000001_max",
 			Headers:        superAuthHeader,
 			TestAppFactory: setupTestApp,
 			ExpectedStatus: 204,
@@ -1124,7 +1124,7 @@ func TestComputedFieldsDeleteFxUpdatesDependents(t *testing.T) {
 					"Reference to deleted node")
 
 				// Verifica che il nodo base sia cancellato
-				_, err := app.FindRecordById("calculated_fields", "booking_queue_queue_a00000001_max")
+				_, err := app.FindRecordById("_calculated_fields", "booking_queue_queue_a00000001_max")
 				if err == nil {
 					t.Fatalf("Expected record booking_queue_queue_a00000001_max to be deleted, but it still exists")
 				}
@@ -1140,7 +1140,7 @@ func TestComputedFieldsDeleteFxUpdatesDependents(t *testing.T) {
 func checkFormulaUpdate(t testing.TB, app *tests.TestApp, id, expectedFormula, expectedValue, expectedError string) {
 	t.Helper()
 
-	record, err := app.FindRecordById("calculated_fields", id)
+	record, err := app.FindRecordById("_calculated_fields", id)
 	if err != nil {
 		t.Fatalf("checkFormulaUpdate: Errore nel recupero del record %s: %v", id, err)
 	}
@@ -1220,10 +1220,10 @@ func TestResolveDepsAndTxSave(t *testing.T) {
 		app := setupTestApp(t)
 		defer app.Cleanup()
 
-		calculated_fields, _ := app.FindCollectionByNameOrId("calculated_fields")
+		_calculated_fields, _ := app.FindCollectionByNameOrId("_calculated_fields")
 
-		// Crea un record minimale nella collection “calculated_fields”
-		rec := core.NewRecord(calculated_fields)
+		// Crea un record minimale nella collection “_calculated_fields”
+		rec := core.NewRecord(_calculated_fields)
 		rec.Set("id", "abcd123456789ef")
 		rec.Set("formula", tt.formula)
 
@@ -1263,7 +1263,7 @@ func TestCF_TouchOwnerUpdated_WhenFormulaChanges(t *testing.T) {
 	(&tests.ApiScenario{
 		Name:           "patch formula touches owner.updated",
 		Method:         http.MethodPatch,
-		URL:            "/api/collections/calculated_fields/records/" + cfId,
+		URL:            "/api/collections/_calculated_fields/records/" + cfId,
 		Body:           strings.NewReader(`{"formula":"4"}`),
 		Headers:        superAuthHeader,
 		TestAppFactory: setupTestApp,
@@ -1275,7 +1275,7 @@ func TestCF_TouchOwnerUpdated_WhenFormulaChanges(t *testing.T) {
 		BeforeTestFunc: func(t testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
 			t.Helper()
 
-			cf, err := app.FindRecordById("calculated_fields", cfId)
+			cf, err := app.FindRecordById("_calculated_fields", cfId)
 			if err != nil {
 				t.Fatalf("cannot find calculated_field: %v", err)
 			}
@@ -1329,26 +1329,26 @@ func TestCF_TouchOwnerUpdated_WhenFormulaUnchanged_DoesNotTouchOwner(t *testing.
 	sc := &tests.ApiScenario{
 		Name:           "PATCH same formula must NOT touch owner.updated",
 		Method:         http.MethodPatch,
-		URL:            "/api/collections/calculated_fields/records/" + cfId,
+		URL:            "/api/collections/_calculated_fields/records/" + cfId,
 		Headers:        superAuthHeader,
 		TestAppFactory: setupTestApp,
 		ExpectedStatus: 200,
-		  ExpectedContent: []string{
-    `"id":"` + cfId + `"`,
-  },
+		ExpectedContent: []string{
+			`"id":"` + cfId + `"`,
+		},
 	}
 
 	sc.BeforeTestFunc = func(t testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
 		t.Helper()
 
 		// leggi formula attuale
-		cf, err := app.FindRecordById("calculated_fields", cfId)
+		cf, err := app.FindRecordById("_calculated_fields", cfId)
 		if err != nil {
-			t.Fatalf("cannot find calculated_fields/%s: %v", cfId, err)
+			t.Fatalf("cannot find _calculated_fields/%s: %v", cfId, err)
 		}
 		sameFormula = cf.GetString("formula")
 		if sameFormula == "" {
-			t.Fatalf("test invalid: calculated_fields/%s has empty formula", cfId)
+			t.Fatalf("test invalid: _calculated_fields/%s has empty formula", cfId)
 		}
 
 		// leggi owner.updated prima
@@ -1399,7 +1399,7 @@ func TestCF_ParentValueEmptyString_IsHandledAsNull_NotCrash(t *testing.T) {
 	(&tests.ApiScenario{
 		Name:           `parent value=="" must not crash child eval (treat as null)`,
 		Method:         http.MethodPost,
-		URL:            "/api/collections/calculated_fields/records",
+		URL:            "/api/collections/_calculated_fields/records",
 		Headers:        superAuthHeader,
 		TestAppFactory: setupTestApp,
 
@@ -1427,9 +1427,9 @@ func TestCF_ParentValueEmptyString_IsHandledAsNull_NotCrash(t *testing.T) {
 			seedOwner(childOwnerRow)
 
 			// 2) Seed parent CF "sporco": value == "" bypassando hook
-			cfCol, err := app.FindCollectionByNameOrId("calculated_fields")
+			cfCol, err := app.FindCollectionByNameOrId("_calculated_fields")
 			if err != nil {
-				t.Fatalf("cannot find calculated_fields: %v", err)
+				t.Fatalf("cannot find _calculated_fields: %v", err)
 			}
 
 			parent := core.NewRecord(cfCol)
@@ -1458,17 +1458,17 @@ func TestCF_ParentValueEmptyString_IsHandledAsNull_NotCrash(t *testing.T) {
 		// Se oggi il codice fa json.Unmarshal("") e crasha/errore, qui non sarà 200.
 		ExpectedStatus: 200,
 		ExpectedContent: []string{
-  `"id":"ut_child_dep_on_empty"`,
-  `"value":"#VALUE!"`,
-  `"error":"Tipo non compatibile nell'operazione"`,
-},
+			`"id":"ut_child_dep_on_empty"`,
+			`"value":"#VALUE!"`,
+			`"error":"Tipo non compatibile nell'operazione"`,
+		},
 	}).Test(t)
 }
 func TestResolveDeps_MissingParentIds_MustBeDetected(t *testing.T) {
 	app := setupTestApp(t)
 	defer app.Cleanup()
 
-	cfCol, _ := app.FindCollectionByNameOrId("calculated_fields")
+	cfCol, _ := app.FindCollectionByNameOrId("_calculated_fields")
 
 	// usa un id che sai esistere nel dump come parent "OK"
 	okParent := "booking_queue_queue_a00000001_min"
@@ -1509,14 +1509,14 @@ func TestCF_ChangingParentFormulaButSameResult_DoesNotTouchChildUpdated(t *testi
 	(&tests.ApiScenario{
 		Name:           "PATCH parent formula (same result) must NOT update child.updated",
 		Method:         http.MethodPatch,
-		URL:            "/api/collections/calculated_fields/records/" + parentID,
+		URL:            "/api/collections/_calculated_fields/records/" + parentID,
 		Headers:        superAuthHeader,
 		TestAppFactory: setupTestApp,
 
 		BeforeTestFunc: func(t testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
 			t.Helper()
 
-			child, err := app.FindRecordById("calculated_fields", childID)
+			child, err := app.FindRecordById("_calculated_fields", childID)
 			if err != nil {
 				t.Fatalf("cannot find child CF %s: %v", childID, err)
 			}
@@ -1532,15 +1532,15 @@ func TestCF_ChangingParentFormulaButSameResult_DoesNotTouchChildUpdated(t *testi
 		Body: strings.NewReader(`{"formula":"2 + 3"}`),
 
 		ExpectedStatus: 200,
-    ExpectedContent: []string{
-        `"id":"` + parentID + `"`,
-        `"formula":"2 + 3"`,
-        `"value":5`, // opzionale ma utile: il parent resta 5
-    },
+		ExpectedContent: []string{
+			`"id":"` + parentID + `"`,
+			`"formula":"2 + 3"`,
+			`"value":5`, // opzionale ma utile: il parent resta 5
+		},
 		AfterTestFunc: func(t testing.TB, app *tests.TestApp, _ *http.Response) {
 			t.Helper()
 
-			child, err := app.FindRecordById("calculated_fields", childID)
+			child, err := app.FindRecordById("_calculated_fields", childID)
 			if err != nil {
 				t.Fatalf("cannot reload child CF %s: %v", childID, err)
 			}
@@ -1559,7 +1559,7 @@ func TestCF_ChangingParentFormulaButSameResult_DoesNotTouchChildUpdated(t *testi
 			}
 		},
 	}).Test(t)
-} 
+}
 
 func TestCalculatedFields_TouchOwnerUpdated_FailsIfOwnerMissing(t *testing.T) {
 	autApp, _ := tests.NewTestApp("../pb_data")
@@ -1574,7 +1574,7 @@ func TestCalculatedFields_TouchOwnerUpdated_FailsIfOwnerMissing(t *testing.T) {
 	(&tests.ApiScenario{
 		Name:    "Patch formula fails with 1008 when owner missing",
 		Method:  http.MethodPatch,
-		URL:     "/api/collections/calculated_fields/records/" + cfId,
+		URL:     "/api/collections/_calculated_fields/records/" + cfId,
 		Headers: authHeader,
 		Body:    strings.NewReader(`{ "formula": "2" }`),
 
@@ -1583,9 +1583,9 @@ func TestCalculatedFields_TouchOwnerUpdated_FailsIfOwnerMissing(t *testing.T) {
 		BeforeTestFunc: func(t testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
 			t.Helper()
 
-			cfCol, err := app.FindCollectionByNameOrId("calculated_fields")
+			cfCol, err := app.FindCollectionByNameOrId("_calculated_fields")
 			if err != nil {
-				t.Fatalf("cannot find calculated_fields collection: %v", err)
+				t.Fatalf("cannot find _calculated_fields collection: %v", err)
 			}
 
 			rec := core.NewRecord(cfCol)
@@ -1636,7 +1636,7 @@ func TestCalculatedFields_GenericOwnerCascadeDelete_UsesExistingBookingQueue(t *
 	}
 
 	(&tests.ApiScenario{
-		Name:           "delete owner triggers calculated_fields cascade delete",
+		Name:           "delete owner triggers _calculated_fields cascade delete",
 		Method:         http.MethodDelete,
 		URL:            "/api/collections/" + ownerCol + "/records/" + ownerId,
 		Headers:        authHeader,
@@ -1653,12 +1653,12 @@ func TestCalculatedFields_GenericOwnerCascadeDelete_UsesExistingBookingQueue(t *
 				t.Fatalf("expected owner %s/%s to be deleted, but it still exists", ownerCol, ownerId)
 			}
 
-			// calculated_fields must be gone (these IDs are real in your dump)  [oai_citation:3‡cf.json](sediment://file_000000000f7872468f1977a058db2d32)
+			// _calculated_fields must be gone (these IDs are real in your dump)  [oai_citation:3‡cf.json](sediment://file_000000000f7872468f1977a058db2d32)
 			for _, cfId := range []string{actID, minID, maxID} {
 				if strings.TrimSpace(cfId) == "" {
 					continue
 				}
-				if _, err := app.FindRecordById("calculated_fields", cfId); err == nil {
+				if _, err := app.FindRecordById("_calculated_fields", cfId); err == nil {
 					t.Fatalf("expected calculated_field %q to be deleted (cascade), but it still exists", cfId)
 				}
 			}
@@ -1670,16 +1670,16 @@ func TestCalculatedFields_Create_DoesNotFail_WhenOwnerPoolHasNoUpdatedField(t *t
 	autApp, _ := tests.NewTestApp("../pb_data")
 	defer autApp.Cleanup()
 
-	 superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autApp)}
-	
+	superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autApp)}
+
 	ownerColName := "cf_owner_pool"
-ownerId := "cfownnoupd00002" 
-cfId := "utcfnoupd000002"  
+	ownerId := "cfownnoupd00002"
+	cfId := "utcfnoupd000002"
 
 	(&tests.ApiScenario{
 		Name:           "create calculated_field with cf_owner_pool owner without updated field must not fail",
 		Method:         http.MethodPost,
-		URL:            "/api/collections/calculated_fields/records",
+		URL:            "/api/collections/_calculated_fields/records",
 		Headers:        superAuthHeader,
 		TestAppFactory: setupTestApp,
 
@@ -1729,21 +1729,18 @@ func TestCalculatedFields_AutoCreate_OnOwnerCreate_BookingQueue(t *testing.T) {
 	autApp, _ := tests.NewTestApp("../pb_data")
 	defer autApp.Cleanup()
 
-	 superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autApp)}
-	
+	superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autApp)}
 
 	ownerCol := "booking_queue"
-	ownerId := "utqueue000000001"  // 15 chars
-	
+	ownerId := "utqueue000000001" // 15 chars
 
 	(&tests.ApiScenario{
-		Name:           "create booking_queue auto-creates calculated_fields act/min/max",
+		Name:           "create booking_queue auto-creates _calculated_fields act/min/max",
 		Method:         http.MethodPost,
 		URL:            "/api/collections/" + ownerCol + "/records",
 		Headers:        superAuthHeader,
 		TestAppFactory: setupTestApp,
 
-	
 		Body: strings.NewReader(`{
 			"id": "` + ownerId + `",
 			"queue_name": "UT Queue",
@@ -1772,7 +1769,7 @@ func TestCalculatedFields_AutoCreate_OnOwnerCreate_BookingQueue(t *testing.T) {
 				t.Fatalf("expected owner %s/%s to have act_fx/min_fx/max_fx set, got act=%q min=%q max=%q", ownerCol, ownerId, actID, minID, maxID)
 			}
 
-			// Verify the calculated_fields records exist and point back to the owner
+			// Verify the _calculated_fields records exist and point back to the owner
 			for _, tc := range []struct {
 				field string
 				cfId  string
@@ -1781,9 +1778,9 @@ func TestCalculatedFields_AutoCreate_OnOwnerCreate_BookingQueue(t *testing.T) {
 				{"min_fx", minID},
 				{"max_fx", maxID},
 			} {
-				cf, err := app.FindRecordById("calculated_fields", tc.cfId)
+				cf, err := app.FindRecordById("_calculated_fields", tc.cfId)
 				if err != nil {
-					t.Fatalf("expected calculated_fields/%s to exist (owner field %s), but not found: %v", tc.cfId, tc.field, err)
+					t.Fatalf("expected _calculated_fields/%s to exist (owner field %s), but not found: %v", tc.cfId, tc.field, err)
 				}
 
 				if cf.GetString("owner_collection") != ownerCol || cf.GetString("owner_row") != ownerId {
@@ -1807,8 +1804,7 @@ func TestCalculatedFields_AutoCreate_AntiHijack_OnOwnerCreate_BookingQueue(t *te
 	autApp, _ := tests.NewTestApp("../pb_data")
 	defer autApp.Cleanup()
 
-	 superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autApp)}
-	
+	superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autApp)}
 
 	ownerCol := "booking_queue"
 	owner1Id := "utqueue000000001"
@@ -1825,8 +1821,6 @@ func TestCalculatedFields_AutoCreate_AntiHijack_OnOwnerCreate_BookingQueue(t *te
 
 		BeforeTestFunc: func(t testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
 			t.Helper()
-
-		
 
 			// Create owner1 normally -> auto-create should generate CFs
 			bqCol, err := app.FindCollectionByNameOrId(ownerCol)
@@ -1899,9 +1893,9 @@ func TestCalculatedFields_Update_RequiresOwnerUpdatePermission(t *testing.T) {
 				Required: true,
 			})
 
-			cfCol, err := app.FindCollectionByNameOrId("calculated_fields")
+			cfCol, err := app.FindCollectionByNameOrId("_calculated_fields")
 			if err != nil {
-				t.Fatalf("cannot find calculated_fields collection: %v", err)
+				t.Fatalf("cannot find _calculated_fields collection: %v", err)
 			}
 
 			ownerCol.Fields.Add(&core.RelationField{
@@ -1992,7 +1986,7 @@ func TestCalculatedFields_Update_RequiresOwnerUpdatePermission(t *testing.T) {
 			},
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
 				cfId, allowedToken, _, _ := seedAll(t, app)
-				sc.URL = "/api/collections/calculated_fields/records/" + cfId
+				sc.URL = "/api/collections/_calculated_fields/records/" + cfId
 				sc.Headers = map[string]string{"Authorization": allowedToken}
 				sc.ExpectedContent = append(sc.ExpectedContent, `"id":"`+cfId+`"`)
 			},
@@ -2009,15 +2003,15 @@ func TestCalculatedFields_Update_RequiresOwnerUpdatePermission(t *testing.T) {
 			Body:           strings.NewReader(`{"formula":"3"}`),
 			ExpectedStatus: 403,
 			ExpectedContent: []string{
-  `"message":"Forbidden updating calculated_fields/`,
-  `user administrators/` + deniedAdminId,
-  `has no update access to owner ` + ownerColName + `/` + ownerId,
-},
+				`"message":"Forbidden updating _calculated_fields/`,
+				`user administrators/` + deniedAdminId,
+				`has no update access to owner ` + ownerColName + `/` + ownerId,
+			},
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
 				cfId, _, deniedToken, _ := seedAll(t, app)
-				sc.URL = "/api/collections/calculated_fields/records/" + cfId
+				sc.URL = "/api/collections/_calculated_fields/records/" + cfId
 				sc.Headers = map[string]string{"Authorization": deniedToken}
-				sc.ExpectedContent = append(sc.ExpectedContent, `calculated_fields/`+cfId)
+				sc.ExpectedContent = append(sc.ExpectedContent, `_calculated_fields/`+cfId)
 			},
 		}
 		sc.Test(t)
@@ -2031,12 +2025,12 @@ func TestCalculatedFields_Update_RequiresOwnerUpdatePermission(t *testing.T) {
 			TestAppFactory: setupTestApp,
 			Body:           strings.NewReader(`{"formula":"4"}`),
 			ExpectedStatus: 200,
-			  ExpectedContent: []string{
-    `"formula":"4"`,
-  },
+			ExpectedContent: []string{
+				`"formula":"4"`,
+			},
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
 				cfId, _, _, superToken := seedAll(t, app)
-				sc.URL = "/api/collections/calculated_fields/records/" + cfId
+				sc.URL = "/api/collections/_calculated_fields/records/" + cfId
 				sc.Headers = map[string]string{"Authorization": superToken}
 			},
 		}
@@ -2044,12 +2038,9 @@ func TestCalculatedFields_Update_RequiresOwnerUpdatePermission(t *testing.T) {
 	})
 }
 
-
-
-
 func TestCalculatedFields_ServerSideSave_RecalculatesValue(t *testing.T) {
 	// Questo test si aspetta il "vecchio comportamento":
-	// un app.Save(record) (NON request) su calculated_fields deve triggerare ricalcolo/value update.
+	// un app.Save(record) (NON request) su _calculated_fields deve triggerare ricalcolo/value update.
 	//
 	// Con i hook spostati su OnRecordUpdateRequest/OnRecordCreateRequest, dovrebbe FALLIRE,
 	// perché app.Save(...) non passa dalla request pipeline.
@@ -2060,9 +2051,9 @@ func TestCalculatedFields_ServerSideSave_RecalculatesValue(t *testing.T) {
 	// usa un CF che sai esistere nel tuo test_pb_data
 	cfId := "booking_queue_queue_zb3456789_min"
 
-	cf, err := app.FindRecordById("calculated_fields", cfId)
+	cf, err := app.FindRecordById("_calculated_fields", cfId)
 	if err != nil {
-		t.Fatalf("cannot find calculated_fields/%s: %v", cfId, err)
+		t.Fatalf("cannot find _calculated_fields/%s: %v", cfId, err)
 	}
 
 	oldFormula := cf.GetString("formula")
@@ -2073,21 +2064,20 @@ func TestCalculatedFields_ServerSideSave_RecalculatesValue(t *testing.T) {
 
 	// 🔴 server-side save (NON request)
 	if err := app.Save(cf); err != nil {
-		t.Fatalf("server-side app.Save(calculated_fields/%s) failed: %v", cfId, err)
+		t.Fatalf("server-side app.Save(_calculated_fields/%s) failed: %v", cfId, err)
 	}
 
 	// ricarica da db
-	after, err := app.FindRecordById("calculated_fields", cfId)
+	after, err := app.FindRecordById("_calculated_fields", cfId)
 	if err != nil {
-		t.Fatalf("cannot reload calculated_fields/%s: %v", cfId, err)
+		t.Fatalf("cannot reload _calculated_fields/%s: %v", cfId, err)
 	}
 
 	newFormula := after.GetString("formula")
 	newValue := after.GetString("value")
 
-
 	// la formula deve essere aggiornata (questa dovrebbe PASSARE)
-	if newValue != "100" || newFormula !="100"{
+	if newValue != "100" || newFormula != "100" {
 		t.Fatalf("expected formula to be persisted as %q, got %q (old=%q, new=%q)", "100", newValue, oldFormula, newFormula)
 	}
 
@@ -2095,7 +2085,7 @@ func TestCalculatedFields_ServerSideSave_RecalculatesValue(t *testing.T) {
 	// (Se oggi sei solo su request hooks, qui tipicamente rimane il vecchio value e il test FALLISCE)
 	if got := after.GetString("value"); got != "100" {
 		t.Fatalf(
-			"EXPECTED recalculation on server-side Save did not happen.\ncalculated_fields/%s\noldValue=%s\nnewValue=%s\n(oldFormula=%q)\n",
+			"EXPECTED recalculation on server-side Save did not happen.\n_calculated_fields/%s\noldValue=%s\nnewValue=%s\n(oldFormula=%q)\n",
 			cfId, oldValue, got, oldFormula,
 		)
 	}
@@ -2113,7 +2103,7 @@ func TestCalculatedFields_AutoCreate_ServerSideSave_ShouldEvaluateCF(t *testing.
 	superAuthHeader := map[string]string{"Authorization": getSuperuserToken(t, autApp)}
 
 	ownerColName := "ut_owner_eval" // ok
-ownerId := "utoeval00000001" 
+	ownerId := "utoeval00000001"
 
 	// app factory con hook
 	factory := func(t testing.TB) *tests.TestApp {
@@ -2135,13 +2125,13 @@ ownerId := "utoeval00000001"
 		BeforeTestFunc: func(t testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
 			t.Helper()
 
-			// 1) crea owner collection con relation single-select verso calculated_fields
+			// 1) crea owner collection con relation single-select verso _calculated_fields
 			if _, err := app.FindCollectionByNameOrId(ownerColName); err != nil {
 				ownerCol := core.NewBaseCollection(ownerColName)
 
-				cfCol, err := app.FindCollectionByNameOrId("calculated_fields")
+				cfCol, err := app.FindCollectionByNameOrId("_calculated_fields")
 				if err != nil {
-					t.Fatalf("cannot find calculated_fields: %v", err)
+					t.Fatalf("cannot find _calculated_fields: %v", err)
 				}
 
 				ownerCol.Fields.Add(&core.RelationField{
@@ -2189,9 +2179,9 @@ ownerId := "utoeval00000001"
 			cfId := ids[0]
 
 			// 3) CF esiste?
-			cf, err := app.FindRecordById("calculated_fields", cfId)
+			cf, err := app.FindRecordById("_calculated_fields", cfId)
 			if err != nil {
-				t.Fatalf("expected calculated_fields/%s to exist, but not found: %v", cfId, err)
+				t.Fatalf("expected _calculated_fields/%s to exist, but not found: %v", cfId, err)
 			}
 
 			// 4) ✅ aspettativa: il CF creato via txApp.Save(newCF) deve essere anche valutato
@@ -2215,7 +2205,7 @@ ownerId := "utoeval00000001"
 			}
 
 			if !isZero {
-				t.Fatalf("CF auto-created was NOT evaluated.\ncalculated_fields/%s\nformula=%q\nvalue(raw)=%q\nparsed=%#v\nerror=%q\n\nThis usually fails when CF calc hook is bound only to *Request* events and the CF is created via txApp.Save() inside owner-create hook.",
+				t.Fatalf("CF auto-created was NOT evaluated.\n_calculated_fields/%s\nformula=%q\nvalue(raw)=%q\nparsed=%#v\nerror=%q\n\nThis usually fails when CF calc hook is bound only to *Request* events and the CF is created via txApp.Save() inside owner-create hook.",
 					cfId,
 					cf.GetString("formula"),
 					raw,
@@ -2225,7 +2215,7 @@ ownerId := "utoeval00000001"
 			}
 
 			if cf.GetString("error") != "" {
-				t.Fatalf("CF auto-created has unexpected error.\ncalculated_fields/%s\nerror=%q\nvalue=%q\nformula=%q",
+				t.Fatalf("CF auto-created has unexpected error.\n_calculated_fields/%s\nerror=%q\nvalue=%q\nformula=%q",
 					cfId, cf.GetString("error"), cf.GetString("value"), cf.GetString("formula"),
 				)
 			}
