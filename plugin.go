@@ -1,7 +1,6 @@
 package calculatedfields
 
 import (
-	"calculatedfields/hooks"
 	"fmt"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbuilds/xpb"
@@ -34,16 +33,21 @@ func (p *Plugin) Description() string {
 
 // Init implements xpb.Plugin.
 func (p *Plugin) Init(app core.App) error {
-	// 1) Fail-fast / enforce schema
-	if err := hooks.EnsureCalculatedFieldsSystemSchema(app); err != nil {
-		// log utile + error di ritorno
-		app.Logger().Error("calculatedfields: schema ensure failed", "err", err)
-		return fmt.Errorf("calculatedfields: schema ensure failed: %w", err)
-	}
+	// 1) Ensure schema when DB is ready
+	app.OnBootstrap().BindFunc(func(e *core.BootstrapEvent) error {
+		// IMPORTANT: execute PB bootstrap first so DB/DAO are ready,
+		// then ensure our schema.
+		if err := e.Next(); err != nil {
+			return err
+		}
+		if err := EnsureCalculatedFieldsSystemSchema(app); err != nil {
+			return fmt.Errorf("calculatedfields: schema ensure failed: %w", err)
+		}
+		return nil
+	})
 
-	// 2) Register hooks
-	if err := hooks.BindCalculatedFieldsHooks(app); err != nil {
-		app.Logger().Error("calculatedfields: bind hooks failed", "err", err)
+	// 2) Register hooks (ok to bind now; they will run later)
+	if err := BindCalculatedFieldsHooks(app); err != nil {
 		return fmt.Errorf("calculatedfields: bind hooks failed: %w", err)
 	}
 

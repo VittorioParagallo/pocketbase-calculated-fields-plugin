@@ -1,10 +1,17 @@
 # PocketBase Calculated Fields Plugin
 
-This plugin adds **server-side calculated fields** to PocketBase collections.
+A **PocketBase plugin** that adds **server-side calculated fields** with **spreadsheet-like dependency propagation**.
 
-Each calculated field is a record in the `_calculated_fields` collection and is always attached to a real **owner record** (for example: `booking_queue`, or any other collection).
+A calculated field is stored as a record in the `calculated_fields` collection and is attached to a real **owner record**
+(e.g. `booking_queue`, but it works with any collection).
 
-Formulas are automatically evaluated, dependency graphs are built, and updates propagate transactionally across dependent calculated fields — similar to spreadsheet behavior, but fully integrated with PocketBase collections, permissions and hooks.
+When a formula changes, the plugin:
+- parses referenced calculated field IDs,
+- builds/validates the dependency graph (DAG),
+- evaluates affected nodes,
+- saves only nodes that actually changed,
+- updates (`touches`) the owner record `updated` timestamp only when needed,
+- performs everything **transactionally**.
 
 ---
 
@@ -12,264 +19,133 @@ Formulas are automatically evaluated, dependency graphs are built, and updates p
 
 A calculated field is defined by:
 
-- a **formula**
-- an **owner collection**
-- an **owner record**
-- an **owner field**
+- **formula**: an expression evaluated with `expr-lang`
+- **owner_collection**: name of the owner collection
+- **owner_row**: ID of the owner record
+- **owner_field**: the owner field logically “holding” the computed value
+- **depends_on**: relation to other `calculated_fields` referenced by the formula (derived automatically)
+
+> Think of `calculated_fields` as a backend-only storage for computed values.
+> Your app mainly interacts with the **owner collection** fields.
 
 ---
 
 ## 📦 Features
 
-- ⚙️ Automatic evaluation on create / update / delete  
-- 🔁 Dependency graph resolution (DAG, BFS propagation)  
-- 🛑 Self-reference and circular dependency detection  
-- ❗ Spreadsheet-like error handling (`#REF!`, `#DIV/0!`, `#VALUE!`, etc.)  
-- 🔐 Permission-aware: update allowed only if owner record is writable  
-- 🧹 Cascade delete when owner record is deleted  
-- ⏱ Touches `owner.updated` only when value actually changes  
-- 🧪 Full test suite with isolated test database  
-- 💯 Transactional: all recalculations happen inside one DB transaction  
+- ⚙️ Automatic evaluation on create / update / delete
+- 🔁 Dependency resolution (DAG + BFS propagation)
+- 🛑 Self-reference and circular dependency detection
+- ❗ Spreadsheet-like errors (`#REF!`, `#DIV/0!`, `#VALUE!`, …)
+- 🔐 Permission-aware: updates allowed only if owner record is writable
+- 🧹 Cascade delete when owner record is deleted
+- ⏱ Touches `owner.updated` only when `(value, error)` changes
+- 💯 Transactional recalculation (single DB transaction)
+- 🧪 Full test suite with isolated test database snapshot
 
 ---
 
 ## 📂 Data Model
 
-Collection: **`_calculated_fields`**
+Collection: **`calculated_fields`** (non-system)
 
-| Field | Type | Description |
-|------|------|-------------|
-| `formula` | text | Expression evaluated with expr-lang |
-| `value` | json | Computed value |
-| `error` | text | Error message if evaluation fails |
-| `depends_on` | relation (self) | Referenced _calculated_fields |
-| `owner_collection` | text | Collection name of the owner |
-| `owner_row` | text | Record ID of the owner |
-| `owner_field` | text | Field name in the owner record |
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `formula` | text | ✅ | Expression to evaluate |
+| `value` | json | ❌ | Computed value |
+| `error` | text | ❌ | Human-readable error message |
+| `depends_on` | relation → `calculated_fields` | ❌ | Dependencies (auto-managed) |
+| `owner_collection` | text | ✅ | Owner collection name |
+| `owner_row` | text | ✅ | Owner record ID |
+| `owner_field` | text | ✅ | Owner field name |
 
-Each calculated field belongs to exactly **one owner record**.
+### About the `id`
+- Use PocketBase defaults (15 chars, starts with a letter).
+- The plugin **rejects client-provided `id`** on create/update requests for `calculated_fields` (server-generated IDs only).
+  (Internal server code may still seed explicit IDs if you bypass hooks.)
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Installation (pbx / Go plugin integration)
 
-### 1️⃣ Run PocketBase
+This repository is a Go module that you import into your PocketBase project.
+
+### 1) Add dependency
 
 ```bash
-go run .
+go get <MODULE_PATH>
+go mod tidy
 ```
-then you can create any collection with a relation field to calculated_field. You should immagine the calculated field like a merged field in the owner collection and not care about the external table.
-If you import the code in your project make sure to create a _calculated_fields table like:
-```
-{
-  "id": "pbc_2828438558",
-  "listRule": "@request.auth.id != \"\" ",
-  "viewRule": "@request.auth.id != \"\" ",
-  "createRule": null,
-  "updateRule": "@request.auth.id != \"\"",
-  "deleteRule": null,
-  "name": "_calculated_fields",
-  "type": "base",
-  "fields": [
-    {
-      "autogeneratePattern": "[a-z0-9A-Z_]{15}",
-      "hidden": false,
-      "id": "text3208210256",
-      "max": 0,
-      "min": 15,
-      "name": "id",
-      "pattern": "^[a-z0-9A-Z_]+$",
-      "presentable": false,
-      "primaryKey": true,
-      "required": true,
-      "system": true,
-      "type": "text"
-    },
-    {
-      "autogeneratePattern": "",
-      "hidden": false,
-      "id": "text1731287169",
-      "max": 0,
-      "min": 0,
-      "name": "formula",
-      "pattern": "",
-      "presentable": false,
-      "primaryKey": false,
-      "required": true,
-      "system": false,
-      "type": "text"
-    },
-    {
-      "hidden": false,
-      "id": "json494360628",
-      "maxSize": 0,
-      "name": "value",
-      "presentable": false,
-      "required": false,
-      "system": false,
-      "type": "json"
-    },
-    {
-      "autogeneratePattern": "",
-      "hidden": false,
-      "id": "text1574812785",
-      "max": 0,
-      "min": 0,
-      "name": "error",
-      "pattern": "",
-      "presentable": false,
-      "primaryKey": false,
-      "required": false,
-      "system": false,
-      "type": "text"
-    },
-    {
-      "cascadeDelete": false,
-      "collectionId": "pbc_2828438558",
-      "hidden": false,
-      "id": "relation1357191210",
-      "maxSelect": 999,
-      "minSelect": 0,
-      "name": "depends_on",
-      "presentable": false,
-      "required": false,
-      "system": false,
-      "type": "relation"
-    },
-    {
-      "autogeneratePattern": "",
-      "hidden": false,
-      "id": "text2921856119",
-      "max": 0,
-      "min": 0,
-      "name": "owner_collection",
-      "pattern": "",
-      "presentable": false,
-      "primaryKey": false,
-      "required": true,
-      "system": false,
-      "type": "text"
-    },
-    {
-      "autogeneratePattern": "",
-      "hidden": false,
-      "id": "text737929361",
-      "max": 0,
-      "min": 0,
-      "name": "owner_row",
-      "pattern": "",
-      "presentable": false,
-      "primaryKey": false,
-      "required": true,
-      "system": false,
-      "type": "text"
-    },
-    {
-      "autogeneratePattern": "",
-      "hidden": false,
-      "id": "text2876010623",
-      "max": 0,
-      "min": 0,
-      "name": "owner_field",
-      "pattern": "",
-      "presentable": false,
-      "primaryKey": false,
-      "required": true,
-      "system": false,
-      "type": "text"
-    },
-    {
-      "hidden": false,
-      "id": "autodate2990389176",
-      "name": "created",
-      "onCreate": true,
-      "onUpdate": false,
-      "presentable": false,
-      "system": false,
-      "type": "autodate"
-    },
-    {
-      "hidden": false,
-      "id": "autodate3332085495",
-      "name": "updated",
-      "onCreate": true,
-      "onUpdate": true,
-      "presentable": false,
-      "system": false,
-      "type": "autodate"
-    }
-  ],
-  "indexes": [
-    "CREATE UNIQUE INDEX `idx_YNg4iO7WjN` ON `_calculated_fields` (\n  `owner_collection`,\n  `owner_row`,\n  `owner_field`\n)",
-    "CREATE INDEX `idx_mEyneRsYiH` ON `_calculated_fields` (`owner_row`)",
-    "CREATE INDEX `idx_6f4JzAzWdy` ON `_calculated_fields` (`owner_collection`)",
-    "CREATE INDEX `idx_hIue6Y0lhZ` ON `_calculated_fields` (`owner_field`)"
-  ],
-  "created": "2025-11-01 18:50:58.367Z",
-  "updated": "2026-01-17 22:53:30.111Z",
-  "system": false
+
+### 2) Register the plugin in your PocketBase `main.go`
+
+Example layout (PocketBase “pbx-style” app: a custom `cmd/dev/main.go` or your own PB app entrypoint):
+
+```go
+import (
+  "github.com/pocketbase/pocketbase"
+  // ...
+  calculatedfields "<MODULE_PATH>"
+)
+
+func main() {
+  app := pocketbase.New()
+
+  calculatedfields.Register(app)
+
+  // start PB
+  app.Start()
 }
 ```
+
+> Replace `<MODULE_PATH>` with the real module path once published.
+
 ---
 
-### 2️⃣ 🧠 Automatic Owner Synchronization (Collections → _calculated_fields)
+## 🧩 Setup: create the `calculated_fields` collection
 
-One of the core features of this plugin is the automatic synchronization between any collection and the _calculated_fields collection.
+Create a **non-system** collection named `calculated_fields` with the fields listed above.
+You can do it from the Admin UI, or import a JSON schema.
 
-Whenever a record is created or updated in a collection that contains a relation field pointing to _calculated_fields, the plugin automatically manages the lifecycle of the corresponding calculated field record.
+### Recommended `id` settings
+Keep the PB defaults, i.e.:
+- Pattern: `^[a-z][a-z0-9_]*[a-z0-9]$`
+- Autogenerate: `[a-z][a-z0-9_]{13}[a-z0-9]`
 
-This makes _calculated_fields behave like a true computed field attached to another collection, rather than a standalone table.
+---
 
-🔹 Automatic creation of _calculated_fields records
+## 🔁 Automatic Owner Synchronization (Owner collections → `calculated_fields`)
 
-If a collection contains a relation field referencing _calculated_fields (for example: min_fx, max_fx, act_fx, etc.):
+If an owner collection contains a **relation field** pointing to `calculated_fields`
+(e.g. `min_fx`, `max_fx`, `act_fx`), the plugin automatically manages the related
+`calculated_fields` record lifecycle.
 
-When a new record is created in that collection:
-	•	the plugin automatically creates a corresponding record in _calculated_fields
-	•	links it back to the owner record
-	•	initializes its formula and metadata
-	•	sets ownership information
+### On owner record create
+- creates the corresponding `calculated_fields` record,
+- links it to the owner record,
+- initializes formula + metadata,
+- does it in the same transaction.
 
-This happens transparently inside the same database transaction.
+### On owner record update
+- protects against hijacking,
+- keeps ownership metadata consistent,
+- re-evaluates affected formulas.
 
-Example:
-
-Collection: booking_queue
-Field: min_fx → relation to _calculated_fields
-
-When you create a new booking_queue record:
-booking_queue
- └─ min_fx → _calculated_fields record is automatically created
-
-### 3️⃣ Edit a calculated field formula
-
-Open the `_calculated_fields` collection and update:
-
-```text
-formula = 2 + 3
-```
-
-The plugin automatically computes:
-
-```text
-value = 5
-```
-
-and touches the owner record `updated` field.
+This makes calculated fields behave like **true computed fields attached to the owner**, not like a standalone table.
 
 ---
 
 ## 🧪 Formula Syntax
 
-Formulas are executed using [expr-lang](https://github.com/expr-lang/expr).
+Formulas are executed with [`expr-lang`](https://github.com/expr-lang/expr).
 
-You can reference other calculated fields by ID:
+### Referencing other calculated fields
+You reference dependencies by **calculated_field record ID**:
 
 ```text
-booking_queue_queue_a0001_min + 1
+abc123def456ghi + 1
 ```
 
-You can use functions:
+### Functions (examples)
 
 ```text
 sum([A, B, 3])
@@ -279,12 +155,11 @@ len(my_array)
 ```
 
 Supported patterns include:
-
-- numeric operations  
-- arrays  
-- aggregate functions  
-- ternary / if blocks  
-- nested formulas  
+- numeric operations
+- arrays
+- aggregate functions
+- if blocks / ternary
+- nested formulas
 
 ---
 
@@ -292,12 +167,11 @@ Supported patterns include:
 
 When a formula is created or updated:
 
-1. Identifiers are parsed from the formula  
-2. Dependencies are extracted (`depends_on`)  
-3. Self-reference is rejected  
-4. Cycles are detected  
-5. DAG is built  
-6. Evaluation propagates to dependent nodes  
+1. Identifiers are parsed from the formula
+2. Dependencies are extracted and stored in `depends_on`
+3. Self-reference is rejected
+4. Cycles are detected (DAG validation)
+5. Evaluation propagates only to impacted nodes
 
 Only nodes whose `(value, error)` actually changed are persisted.
 
@@ -329,21 +203,18 @@ Create/Update calculated_field
 Updating a calculated field requires permission to update its owner record.
 
 Rules:
-- superuser always allowed  
-- otherwise: `app.CanAccessRecord(owner, updateRule)`  
-- prevents hijacking calculated fields from foreign records  
-
-This makes calculated fields behave like **true computed properties** of the owner collection.
+- superuser always allowed
+- otherwise: `app.CanAccessRecord(owner, updateRule)`
+- prevents hijacking calculated fields across owners
 
 ---
 
 ## 🗑 Cascade Delete
 
 When an owner record is deleted:
-
-- all its _calculated_fields are deleted automatically  
-- dependent formulas are rewritten to `#REF!`  
-- errors propagate safely  
+- its calculated_fields are deleted automatically,
+- dependent formulas become `#REF!`,
+- errors propagate safely.
 
 ---
 
@@ -363,40 +234,33 @@ When an owner record is deleted:
 
 ## 🧪 Testing
 
-The plugin includes a full test suite covering:
+The repository includes a test suite under `./tests`.
 
-- formula evaluation  
-- propagation  
-- cycles  
-- error handling  
-- permissions  
-- cascade delete  
-- owner updated touch  
-- dirty-check optimization  
-- null / empty handling  
+- Tests use an isolated `tests/pb_data` snapshot (no migrations required).
+- Run:
 
-Tests use an isolated `test_pb_data` database snapshot (no migrations).
+```bash
+go test ./... -v
+```
 
 ---
 
 ## 🧭 Design Philosophy
 
-This plugin is not a spreadsheet emulator.  
+This plugin is not a spreadsheet emulator.
 It is a **reactive computation engine integrated into PocketBase’s data model**.
 
 Goals:
-
-- behave like a native field  
-- respect PocketBase rules and hooks  
-- be deterministic and transactional  
-- be safe in multi-collection environments  
-- remain generic and reusable  
+- behave like a native field
+- respect PocketBase rules and hooks
+- deterministic, transactional, and safe
+- generic and reusable across projects
 
 ---
 
 ## 📌 TODO
 
-- Documentation of supported functions  
-- Example schemas  
-- Performance benchmarks  
-- UI helper for formula editing  
+- Document all supported functions/operators
+- Provide minimal example schemas for common use cases
+- Add performance notes & benchmarks
+- Optional UI helper for formula editing
