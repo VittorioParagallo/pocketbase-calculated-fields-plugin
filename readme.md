@@ -1,5 +1,12 @@
 # PocketBase Calculated Fields Plugin
 
+![Go Version](https://img.shields.io/github/go-mod/go-version/VittorioParagallo/pocketbase-calculated-fields-plugin)
+![Tests](https://github.com/VittorioParagallo/pocketbase-calculated-fields-plugin/actions/workflows/go.yml/badge.svg)
+![Release](https://img.shields.io/github/v/release/VittorioParagallo/pocketbase-calculated-fields-plugin)
+![License](https://img.shields.io/github/license/VittorioParagallo/pocketbase-calculated-fields-plugin)
+
+# PocketBase Calculated Fields Plugin
+
 This plugin adds **server-side calculated fields** to PocketBase collections.
 
 A calculated field is stored as a record in the `calculated_fields` collection and is always attached to a real **owner record** (for example: `booking_queue`, or any other collection). Formulas are automatically evaluated, dependency graphs are built, and updates propagate transactionally across dependent calculated fields — similar to spreadsheet behavior, but fully integrated with PocketBase collections, permissions and hooks.
@@ -64,7 +71,7 @@ Import the package and bind the hooks at startup:
 // example main.go
 import (
   "github.com/pocketbase/pocketbase"
-  "github.com/VittorioParagallo/pocketbase-calculated-fields-plugin"
+  "github.com/your/module/calculatedfields"
 )
 
 func main() {
@@ -76,44 +83,6 @@ func main() {
   }
 
   // ...start your app
-}
-```
-
-or 
-
-
-
----
-
-## 🚀 Installation (pbx / Go plugin integration)
-
-This repository is a Go module that you import into your PocketBase project.
-
-### 1) Add dependency
-
-```bash
-go get github.com/VittorioParagallo/pocketbase-calculated-fields-plugin
-go mod tidy
-```
-
-### 2) Register the plugin in your PocketBase `main.go`
-
-Example layout (PocketBase “pbx-style” app: a custom `cmd/dev/main.go` or your own PB app entrypoint):
-
-```go
-import (
-  "github.com/pocketbase/pocketbase"
-  // ...
-  calculatedfields "github.com/VittorioParagallo/pocketbase-calculated-fields-plugin"
-)
-
-func main() {
-  app := pocketbase.New()
-
-  calculatedfields.Register(app)
-
-  // start PB
-  app.Start()
 }
 ```
 
@@ -174,12 +143,6 @@ When a `calculated_fields` record formula changes:
 - owners get their `updated` touched **only if** `(value, error)` changes
 
 ---
-
-### About the `id`
-- Use PocketBase defaults (15 chars, starts with a letter).
-- The plugin **rejects client-provided `id`** on create/update requests for `calculated_fields` (server-generated IDs only).
-  (Internal server code may still seed explicit IDs if you bypass hooks.)
-------
 
 ## 🧪 Formula Syntax
 
@@ -313,6 +276,84 @@ If you are using a PocketBase build system that bundles plugins (often referred 
 - call `BindCalculatedFieldsHooks(app)` during bootstrap
 
 Because the plugin **ensures the `calculated_fields` collection automatically**, you don’t need extra “install steps” beyond compiling your PocketBase binary with the plugin included.
+
+---
+
+## 🧩 Using the plugin in a custom PocketBase binary
+
+If you are building your own PocketBase binary (custom application), you can vendor this plugin like any other Go module and call the binder during app bootstrap.
+
+PocketBuilds docs (custom application):
+- https://docs.pocketbuilds.com/custom-application
+
+### 1) Add the module
+
+```bash
+go get github.com/vittorioparagallo/pocketbase-calculated-fields-plugin@latest
+go mod tidy
+```
+
+### 2) Bind the hooks in your `main.go`
+
+Example (minimal):
+
+```go
+package main
+
+import (
+	"log"
+
+	calculatedfields "github.com/vittorioparagallo/pocketbase-calculated-fields-plugin"
+	"github.com/pocketbase/pocketbase"
+)
+
+func main() {
+	app := pocketbase.New()
+
+	// Register all calculated fields hooks.
+	if err := calculatedfields.BindCalculatedFieldsHooks(app); err != nil {
+		log.Fatal(err)
+	}
+
+	// ... your other app setup ...
+
+	if err := app.Start(); err != nil {
+		log.Fatal(err)
+	}
+}
+```
+
+### 3) Run/Build
+
+```bash
+go run .
+# or
+go build -o pocketbase_custom .
+```
+
+Once your server starts, the plugin will ensure the `calculated_fields` collection exists and will auto-create/delete calculated fields for owner records that have a **single-select relation** to `calculated_fields`.
+
+---
+
+## 🧱 Using the plugin with the default PocketBase binary (PocketBuilds)
+
+If you don’t want to maintain a custom Go binary, you can still use this plugin by building a PocketBuilds custom binary (or a PocketBuilds-hosted build) that includes this module.
+
+PocketBuilds website:
+- https://pocketbuilds.com/
+
+### Recommended approach
+
+1. Create a **PocketBuilds custom application** (or project template) that uses PocketBase as a dependency.
+2. Add this plugin as a Go module dependency.
+3. Bind the hooks in your bootstrap `main.go` (same as above).
+4. Build and deploy using PocketBuilds.
+
+PocketBuilds docs (custom application):
+- https://docs.pocketbuilds.com/custom-application
+
+> Note: the “default binary” cannot dynamically load arbitrary Go plugins at runtime.
+> You still need a compiled binary that includes this plugin’s code; PocketBuilds is simply the easiest way to obtain and ship that binary without managing your own build pipeline.
 
 ---
 
