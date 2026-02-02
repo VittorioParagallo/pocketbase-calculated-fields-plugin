@@ -1,4 +1,4 @@
-module calculatedfields
+module github.com/vittorioparagallo/pocketbase-calculated-fields-plugin
 
 go 1.25.6
 
