@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"calculatedfields"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,7 +8,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
-
+    calculatedfields "github.com/vittorioparagallo/pocketbase-calculated-fields-plugin"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 	"github.com/pocketbase/pocketbase/tools/security"
