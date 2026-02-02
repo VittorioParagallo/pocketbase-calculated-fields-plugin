@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"calculatedfields"
+	calculatedfields "github.com/vittorioparagallo/pocketbase-calculated-fields-plugin"
 
 	"github.com/pocketbase/pocketbase"
 )
