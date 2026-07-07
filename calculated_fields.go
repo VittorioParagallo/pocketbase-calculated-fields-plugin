@@ -3,9 +3,6 @@ package calculatedfields
 import (
 	"encoding/json"
 	"fmt"
-	"math"
-	"regexp"
-	"strings"
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/file"
 	"github.com/ganigeorgiev/fexpr"
@@ -13,6 +10,9 @@ import (
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/types"
+	"math"
+	"regexp"
+	"strings"
 )
 
 // se chiamato senza parametri registra tutto altrimenti le funzioni indicate nei parametri
@@ -216,9 +216,10 @@ func applyResultAndSave(txApp core.App, node *core.Record, value any, errMsg str
 	// --- TOUCH OWNER.updated (deterministic, strict)
 	ownerCol := node.GetString("owner_collection")
 	ownerRow := node.GetString("owner_row")
+	ownerField := node.GetString("owner_field")
 
 	// se non c'è owner, non tocchiamo nulla (ma puoi decidere di renderlo errore)
-	if ownerCol == "" || ownerRow == "" {
+	if ownerCol == "" || ownerRow == "" || ownerField == "" {
 		return nil
 	}
 
@@ -229,7 +230,18 @@ func applyResultAndSave(txApp core.App, node *core.Record, value any, errMsg str
 				fmt.Sprintf("Invalid owner reference: record %s/%s not found.", ownerCol, ownerRow)),
 		})
 	}
+    
+	ownerIds := ownerRec.GetStringSlice(ownerField)
 
+	if len(ownerIds) == 0 || ownerIds[0] != node.Id {
+
+		// il CF è stato appena creato ma l'owner non lo referenzia ancora:
+
+		// non toccare owner.updated, altrimenti mandi realtime incompleto
+
+		return nil
+
+	}
 	// Aggiornamento deterministico
 	ownerRec.Set("updated", types.NowDateTime())
 

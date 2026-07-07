@@ -73,6 +73,7 @@ func OnOwnerCreate_AutoCreateCalculatedFields(e *core.RecordEvent) error {
 		cfColId := cfCol.Id
 
 		// 2) per ogni relation field dell'owner che punta a calculated_fields
+		changed := false
 		for _, f := range ownerCol.Fields {
 			rel, ok := f.(*core.RelationField)
 			if !ok {
@@ -126,12 +127,19 @@ func OnOwnerCreate_AutoCreateCalculatedFields(e *core.RecordEvent) error {
 
 			// collega il CF appena creato al campo relation dell'owner
 			e.Record.Set(fieldName, []string{newCF.Id})
+            changed = true
 
 			// salva l'owner SENZA HOOKS per non rientrare in OnOwnerCreate_* (loop)
 			if err := txApp.UnsafeWithoutHooks().Save(e.Record); err != nil {
 				return err
 			}
 		}
+
+if changed {
+    if err := txApp.UnsafeWithoutHooks().Save(e.Record); err != nil {
+        return err
+    }
+}
 
 		return nil
 	})
