@@ -476,4 +476,3 @@ func mustFindCol(t testing.TB, app *tests.TestApp, name string) *core.Collection
 	}
 	return col
 }
-
